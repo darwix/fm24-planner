@@ -1,0 +1,59 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B · Ledger</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0f11;--s:#15171a;--line:#23262b;--ink:#e8e9ea;--mut:#797e86;--acc:#d6ff4a;--bad:#ff6b5e;--warn:#f0b24a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px Geist,system-ui,sans-serif}
+.mono,td.n,.k{font-family:'Geist Mono',monospace;font-variant-numeric:tabular-nums}
+.top{display:flex;gap:18px;align-items:center;padding:14px 28px;border-bottom:1px solid var(--line)}
+.top b{font-weight:600}.top span{color:var(--mut)}.top .sp{margin-left:auto}
+.kbd{border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--mut);font:11px 'Geist Mono'}
+main{max-width:1280px;margin:auto;padding:8px 28px 60px}
+.grp{margin:26px 0 6px;color:var(--mut);font-size:11px;letter-spacing:.08em}
+table{width:100%;border-collapse:collapse}
+th{font-weight:500;color:var(--mut);text-align:right;padding:6px 10px;font-size:11px}th:nth-child(-n+2){text-align:left}
+td{padding:9px 10px;border-top:1px solid var(--line);text-align:right}td:nth-child(-n+2){text-align:left}
+tr.p{cursor:pointer;transition:background .12s}tr.p:hover{background:var(--s)}tr.p.open{background:var(--s)}
+td.pos{color:var(--mut);width:44px}td.name{font-weight:500}
+.hi{color:var(--acc)}.lo{color:var(--bad)}.wa{color:var(--warn)}
+.dash{display:inline-block;width:46px;height:3px;background:var(--line);vertical-align:middle;margin-right:8px;position:relative}.dash i{position:absolute;inset:0 auto 0 0;background:var(--ink)}
+tr.x>td{padding:0;background:var(--s)}
+.pan{padding:6px 10px 18px 54px;animation:in .25s ease}
+@keyframes in{from{opacity:0;transform:translateY(-4px)}}
+.hd{display:flex;gap:10px;align-items:center;margin:10px 0}
+.hd .t{font-weight:600}.f{border:1px solid var(--line);color:var(--mut);padding:4px 10px;border-radius:6px;cursor:pointer;transition:.12s}
+.f.on{border-color:var(--acc);color:var(--acc)}.f:hover{color:var(--ink)}
+.act{margin-left:auto;display:flex;gap:6px}
+a.l{color:var(--mut);cursor:pointer}a.l:hover{color:var(--ink)}a.l.bad:hover{color:var(--bad)}
+.c{display:grid;grid-template-columns:44px 1.4fr 70px 110px 80px 80px 1fr 90px;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.m{color:var(--acc);font-weight:600;font-size:15px}
+.tg{font-size:11px;margin-right:8px}.tg.exp{color:var(--warn)}.tg.list{color:#6fb4ff}.tg.cheap{color:var(--acc)}
+.sw{background:var(--acc);color:#111;border:0;border-radius:6px;padding:5px 12px;font:600 12px Geist;cursor:pointer;transition:.12s}.sw:active{transform:scale(.96)}
+</style></head><body>
+<div class="top"><b>Squad planner</b><span>Meong Racun · 2052</span><span class="sp"><a class="l" onclick="add()">+ Add player</a></span><span class="kbd">click row to find replacement</span></div>
+<main><div id="app"></div></main>
+<script src="data.js"></script>
+<script>
+let sel=null,on=['exp','list','cheap'];
+const G=[["GOALKEEPER",["GK"]],["DEFENCE",["DR","DC","DL"]],["MIDFIELD",["DM","MC"]],["ATTACK",["AMR","AML","ST"]]];
+const yr=c=>c<=2052?'lo':c===2053?'wa':'';
+function r(){
+ $('#app').innerHTML=G.map(([g,ps])=>{const rows=squad.map((s,i)=>[s,i]).filter(([s])=>ps.includes(s.p));
+ return `<div class="grp">${g}</div><table><thead><tr><th></th><th>Name</th><th>Age</th><th>CA</th><th>PA</th><th>Pas</th><th>Tck</th><th>Pos</th><th>Contract</th><th>Value</th><th>Wage</th></tr></thead>`+
+ rows.map(([s,i])=>`<tr class="p ${i===sel?'open':''}" onclick="sel=${i===sel?null:i};r()"><td class="pos mono">${s.p}</td><td class="name">${s.n}</td><td class="n">${s.a}</td>
+ <td class="n"><span class="dash"><i style="width:${(s.ca-100)*2}%"></i></span>${s.ca}</td><td class="n">${s.pa}</td><td class="n">${s.at.Pas}</td><td class="n">${s.at.Tck}</td><td class="n">${s.at.Pos}</td>
+ <td class="n ${yr(s.c)}">${s.c}</td><td class="n">${money(s.v)}</td><td class="n">€${s.w}k</td></tr>`+(i===sel?`<tr class="x"><td colspan="11">${panel(s)}</td></tr>`:'')).join('')+'</table>'}).join('')}
+function panel(t){
+ const L=cands.filter(c=>c.tags.some(g=>on.includes(g)));
+ return `<div class="pan"><div class="hd"><span class="t">Replacements for ${t.n}</span>${Object.keys(TAG).map(k=>`<span class="f ${on.includes(k)?'on':''}" onclick="event.stopPropagation();tg('${k}')">${TAG[k]}</span>`).join('')}
+ <span class="act"><a class="l bad" onclick="event.stopPropagation();rm()">Remove from squad</a></span></div>`+
+ L.map(c=>`<div class="c"><span class="m mono">${c.m}</span><span><b>${c.n}</b> <span style="color:var(--mut)">${c.cl}</span></span><span class="k">${c.a}y</span>
+ <span class="k">CA ${c.ca} ${d(c.ca,t.ca)}</span><span class="k">${money(c.v)}</span><span class="k">€${c.w}k</span><span>${c.tags.map(g=>`<span class="tg ${g}">● ${TAG[g]}</span>`).join('')}</span>
+ <button class="sw" onclick="event.stopPropagation();swap('${c.n}')">Swap in</button></div>`).join('')+'</div>'}
+const tg=k=>{on=on.includes(k)?on.filter(x=>x!==k):[...on,k];r()};
+const rm=()=>{squad.splice(sel,1);sel=null;r()};
+const add=()=>{sel=0;r()};
+const swap=n=>{const c=cands.find(x=>x.n===n),o=squad[sel];Object.assign(o,{n:c.n,a:c.a,ca:c.ca,pa:c.pa,c:c.c,v:c.v,w:c.w,at:c.at});sel=null;r()};
+r();
+</script>
+<style>.up{color:var(--acc);font-weight:500}.dn{color:var(--bad);font-weight:500}.eq{color:var(--mut)}</style></body></html>

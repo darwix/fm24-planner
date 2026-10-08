@@ -1,0 +1,57 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C · Scout compare</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1a1613;--s:#231e1a;--s2:#2c2621;--line:#3a322b;--ink:#f1e9df;--mut:#9a8d7e;--acc:#ff8a3d;--up:#8fd16a;--dn:#ef6f5e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px Outfit,system-ui,sans-serif;font-variant-numeric:tabular-nums;height:100vh;display:grid;grid-template-columns:320px 1fr;overflow:hidden}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+aside h1{font-size:15px;font-weight:600;margin:0;padding:20px 20px 4px}aside .sub{padding:0 20px 14px;color:var(--mut);font-size:12px}
+.sc{overflow:auto;flex:1;padding:0 8px}
+.pl{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:10px;cursor:pointer;transition:.12s}.pl:hover{background:var(--s)}
+.pl.sel{background:var(--s2);box-shadow:inset 3px 0 var(--acc)}
+.pl .p{width:30px;color:var(--mut);font-size:11px;font-weight:600}.pl .ca{margin-left:auto;font-weight:600}.pl .w{font-size:11px;color:var(--dn)}
+aside .add{margin:10px;padding:10px;border:1px dashed var(--line);border-radius:10px;background:none;color:var(--mut);font:inherit;cursor:pointer}.add:hover{color:var(--ink);border-color:var(--mut)}
+main{overflow:auto;padding:28px 36px}
+.tgt{display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center;padding-bottom:22px;border-bottom:1px solid var(--line)}
+.tgt h2{margin:0;font-size:34px;font-weight:700;letter-spacing:-.03em}.tgt p{margin:2px 0 0;color:var(--mut)}
+.big{font-size:56px;font-weight:700;line-height:1;color:var(--acc)}
+.bars{display:grid;grid-template-columns:repeat(7,1fr);gap:4px 14px;margin-top:14px}
+.bars div{font-size:11px;color:var(--mut)}.bars b{display:block;font-size:16px;color:var(--ink);font-weight:600}
+.ctl{display:flex;gap:8px;margin:22px 0;align-items:center}.ctl .l{color:var(--mut);margin-right:6px}
+.f{padding:7px 14px;border-radius:99px;background:var(--s);color:var(--mut);cursor:pointer;transition:.12s;font-weight:500}.f.on{background:var(--acc);color:#1a1613}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.card{background:var(--s);border-radius:16px;padding:18px;transition:.15s}.card:hover{background:var(--s2);transform:translateY(-2px)}
+.card:first-child{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.2fr;gap:24px;box-shadow:inset 0 0 0 1.5px var(--acc)}
+.rk{font-size:11px;color:var(--acc);font-weight:600;letter-spacing:.06em}
+.card h3{margin:2px 0;font-size:20px;font-weight:600}.card .cl{color:var(--mut);font-size:13px}
+.m{float:right;font-size:26px;font-weight:700;color:var(--acc)}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}.facts div{font-size:11px;color:var(--mut)}.facts b{display:block;font-size:15px;color:var(--ink);font-weight:500}
+.tg{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;background:#ffffff12;margin-right:6px}
+.cmp{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 12px;align-content:start}
+.cmp div{font-size:11px;color:var(--mut)}.cmp b{display:inline;font-size:15px;color:var(--ink);font-weight:500;margin-right:4px}
+.up{color:var(--up);font-size:12px}.dn{color:var(--dn);font-size:12px}.eq{color:var(--mut);font-size:12px}
+.sw{margin-top:14px;width:100%;padding:10px;border:0;border-radius:10px;background:var(--ink);color:var(--bg);font:600 14px Outfit;cursor:pointer;transition:.12s}.sw:hover{background:var(--acc)}.sw:active{transform:scale(.98)}
+.rm{background:none;border:0;color:var(--mut);cursor:pointer;font:inherit;margin-left:auto}.rm:hover{color:var(--dn)}
+</style></head><body>
+<aside><h1>Meong Racun</h1><div class="sub">2052 · 13 players</div><div class="sc" id="sq"></div><button class="add" onclick="sel=null;r()">+ Add player</button></aside>
+<main id="m"></main>
+<script src="data.js"></script>
+<script>
+let sel=3,on=['exp','list','cheap'];
+function r(){
+ $('#sq').innerHTML=squad.map((s,i)=>`<div class="pl ${i===sel?'sel':''}" onclick="sel=${i};r()"><span class="p">${s.p}</span>${s.n}${s.c<=2052?'<span class="w">expiring</span>':''}<span class="ca">${s.ca}</span></div>`).join('');
+ const t=squad[sel]; if(!t){$('#m').innerHTML=`<h2 style="font-size:28px">Add a player</h2><p style="color:var(--mut)">Pick a position to search the whole database, or select a squad member to replace.</p>`;return}
+ const L=cands.filter(c=>c.tags.some(g=>on.includes(g)));const K=Object.keys(t.at);
+ const cmp=c=>K.map(k=>`<div>${k}<br><b>${c.at[k]}</b>${d(c.at[k],t.at[k])}</div>`).join('');
+ $('#m').innerHTML=`<div class="tgt"><div class="big">${t.ca}</div><div><h2>${t.n}</h2><p>${t.p} · ${t.a} years · contract ${t.c} · €${t.w}k/wk · ${money(t.v)}</p>
+ <div class="bars">${K.map(k=>`<div>${k}<b>${t.at[k]}</b></div>`).join('')}</div></div><button class="rm" onclick="rm()">Remove from squad</button></div>
+ <div class="ctl"><span class="l">Show</span>${Object.keys(TAG).map(k=>`<span class="f ${on.includes(k)?'on':''}" onclick="tg('${k}')">${TAG[k]}</span>`).join('')}</div>
+ <div class="cards">${L.map((c,i)=>`<div class="card"><div>${i?'':'<div class="rk">BEST FIT</div>'}<span class="m">${c.m}%</span><h3>${c.n}</h3><div class="cl">${c.cl} · ${c.a}y</div>
+ <div class="facts"><div>CA / PA<b>${c.ca} / ${c.pa}</b></div><div>Contract<b>${c.c===2053?c.left+' months left':'to '+c.c}</b></div><div>Value<b>${money(c.v)}</b></div><div>Wage<b>€${c.w}k/wk</b></div></div>
+ ${c.tags.map(g=>`<span class="tg">${TAG[g]}</span>`).join('')}<button class="sw" onclick="swap('${c.n}')">Swap in for ${t.n.split(' ').pop()}</button></div>
+ ${i?'':`<div class="cmp">${cmp(c)}</div>`}</div>`).join('')}</div>`}
+const tg=k=>{on=on.includes(k)?on.filter(x=>x!==k):[...on,k];r()};
+const rm=()=>{squad.splice(sel,1);sel=0;r()};
+const swap=n=>{const c=cands.find(x=>x.n===n),o=squad[sel];Object.assign(o,{n:c.n,a:c.a,ca:c.ca,pa:c.pa,c:c.c,v:c.v,w:c.w,at:c.at});r()};
+r();
+</script></body></html>

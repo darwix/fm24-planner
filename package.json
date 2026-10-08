@@ -1,0 +1,26 @@
+{
+  "name": "fm-squad-planner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npx lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,html,css,json,md,yml}": "prettier --write"
+  },
+  "devDependencies": {
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "simple-git-hooks": "^2.11.1",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  }
+}

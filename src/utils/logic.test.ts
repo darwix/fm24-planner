@@ -6,7 +6,7 @@ import {
   asCandidate,
   contractLabel,
   isFmFile,
-} from "./logic.js";
+} from "./logic";
 
 describe("need", () => {
   it("counts missing cover against the position target", () => {
@@ -21,7 +21,7 @@ describe("need", () => {
 
 describe("matchFilter", () => {
   const p = { p: "ST", a: 20, left: 6, v: 3 };
-  const f = { pos: "", min: 18, max: 23, exp: false, val: "" };
+  const f = { pos: "", min: 18, max: 23, exp: false, val: "" as const };
   it("matches any position inside the age range", () => {
     expect(matchFilter(p, f)).toBe(true);
     expect(matchFilter({ ...p, a: 24 }, f)).toBe(false);

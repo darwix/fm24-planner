@@ -1,0 +1,22 @@
+import { atom } from "recoil";
+import type { ScoutList } from "@/models/player";
+
+export const listsState = atom<ScoutList[]>({
+  key: "listsState",
+  default: [
+    {
+      name: "Promising youngsters",
+      f: { pos: "", min: 18, max: 23, exp: false, val: "" },
+      fixed: true,
+    },
+    {
+      name: "Contract expiring",
+      f: { pos: "", min: 16, max: 45, exp: true, val: "" },
+      fixed: true,
+    },
+  ],
+});
+export const listIndexState = atom<number>({
+  key: "listIndexState",
+  default: 0,
+});

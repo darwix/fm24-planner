@@ -11,7 +11,9 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 4. Scouting: preset lists (promising youngsters 18-23, contract expiring) plus custom lists.
 5. Upload flow for the `.fm` save.
 
-## Status: design mock only, no real parser or app yet
+## Status: React app built on the SaveLens backend; contract/value/wage still missing
+
+`src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to the SaveLens server on :4242 (`savelens/FM SaveLens 24/fm-savelens-24-server.exe`); its code is cloned privately in `savelens-src/` (gitignored, no licence). Real data: save list, import, club squad, player attributes. Still placeholder (`public/mocks/*.json`): shortlist candidates and scouting pool. Run: `npm run dev`, `npm test`, `npm run typecheck`.
 
 Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` and `c-compare.html` are rejected alternatives, `index.html` is the first rejected draft. Shared mock data is in `mock/data.js` (placeholder, not parsed from a save).
 

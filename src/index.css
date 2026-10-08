@@ -197,7 +197,7 @@ nav {
   gap: 4px;
   margin-left: 24px;
 }
-nav button {
+nav a {
   font: 500 14px Geist;
   border: 0;
   background: none;
@@ -207,7 +207,7 @@ nav button {
   cursor: pointer;
   transition: 0.15s;
 }
-nav button.on {
+nav a.on {
   background: var(--card);
   color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -360,7 +360,10 @@ nav {
   align-self: stretch;
   gap: 24px;
 }
-nav button {
+nav a {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
   border-radius: 0;
   padding: 0 2px;
   box-shadow: none !important;
@@ -368,11 +371,11 @@ nav button {
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
 }
-nav button.on {
+nav a.on {
   color: var(--ink);
   border-bottom-color: var(--ink);
 }
-nav button:hover {
+nav a:hover {
   color: var(--ink);
 }
 nav em {

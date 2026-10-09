@@ -24,14 +24,17 @@ const FF_RUN: usize = 4; // youth: FF run here; standard: here or one u32 later
 const DAY: usize = 12;
 const YEAR: usize = 14;
 
-
 /// `window` is the bytes before the person record. The first anchor with a wage wins, so a
 /// loaned player reads the parent contract, not the zero-wage loan row.
 pub fn find(window: &[u8], eid: u32) -> Contract {
     let needle = eid.to_le_bytes();
     let anchor = (0..window.len().saturating_sub(ANCHOR_LEN))
         .filter(|&i| window[i..i + 4] == needle)
-        .filter(|&i| window[i + ZEROS..i + WAGE] == [0; 4] && window[i + FLAG] == 1 && window[i + FLAG_PAD] == 0)
+        .filter(|&i| {
+            window[i + ZEROS..i + WAGE] == [0; 4]
+                && window[i + FLAG] == 1
+                && window[i + FLAG_PAD] == 0
+        })
         .find(|&i| u32(window, i + WAGE) > 0);
     let Some(i) = anchor else {
         return Contract::default();
@@ -39,7 +42,8 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
     let expiry = |q: usize| {
         let (day, year) = (u16(window, q + DAY) & 511, u16(window, q + YEAR));
         // Youth contracts have no start year: [FF x4][u32][day][year] instead of [start yr][00 00][X].
-        let youth = window[q + FF_RUN..q + FF_RUN + 4] == [0xff; 4] && window[q + DAY - 2..q + DAY] == [0; 2];
+        let youth = window[q + FF_RUN..q + FF_RUN + 4] == [0xff; 4]
+            && window[q + DAY - 2..q + DAY] == [0; 2];
         let ok = (youth
             || (2020..=2100).contains(&u16(window, q - 4))
                 && window[q - 2..q] == [0; 2]
@@ -52,12 +56,15 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
         ok.then(|| date_of(year, day).ok()).flatten()
     };
     // A false match can sit 4 bytes after the real one, so step back while the earlier one also matches.
-    let contract_end = (4..i.saturating_sub(11)).rev().find(|&q| expiry(q).is_some()).and_then(|mut q| {
-        while q >= 8 && expiry(q - 4).is_some() {
-            q -= 4;
-        }
-        expiry(q)
-    });
+    let contract_end = (4..i.saturating_sub(11))
+        .rev()
+        .find(|&q| expiry(q).is_some())
+        .and_then(|mut q| {
+            while q >= 8 && expiry(q - 4).is_some() {
+                q -= 4;
+            }
+            expiry(q)
+        });
     Contract {
         wage: Some(u32(window, i + WAGE)),
         team: Some(u32(window, i + TEAM)),

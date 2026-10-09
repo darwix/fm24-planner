@@ -1,6 +1,26 @@
-use super::*;
+use crate::{
+    application::Workspace,
+    domain::entities::SaveFile,
+    utils::files::{digest, mtime},
+    Error, Result,
+};
+use chrono::{DateTime, Utc};
+use std::{fs, path::Path, sync::Arc};
 
-impl AppState {
+pub struct SaveUseCase {
+    pub(super) ws: Arc<Workspace>,
+}
+impl SaveUseCase {
+    pub fn new(ws: Arc<Workspace>) -> Self {
+        Self { ws }
+    }
+    pub fn parser_version(&self) -> &str {
+        self.ws.reader.version()
+    }
+    pub fn list_saves(&self) -> Result<Vec<SaveFile>> {
+        let folder = self.ws.inner.lock().unwrap().settings.folder.clone();
+        self.list(&folder)
+    }
     pub(super) fn list(&self, folder: &str) -> Result<Vec<SaveFile>> {
         if folder.is_empty() {
             return Ok(vec![]);
@@ -25,8 +45,9 @@ impl AppState {
             let modified = mtime(&stat)?;
             let path = entry.path().to_string_lossy().into_owned();
             let snapshot_id = digest(&format!(
-                "{path}|{}|{modified}|{PARSER_VERSION}",
-                stat.len()
+                "{path}|{}|{modified}|{}",
+                stat.len(),
+                self.ws.reader.version()
             ));
             saves.push(SaveFile {
                 id: digest(&path),
@@ -36,6 +57,7 @@ impl AppState {
                 modified: DateTime::<Utc>::from(stat.modified()?)
                     .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
                 cached: self
+                    .ws
                     .data
                     .join("snapshots")
                     .join(format!("{snapshot_id}.sqlite"))
@@ -45,19 +67,5 @@ impl AppState {
         }
         saves.sort_by(|a, b| b.modified.cmp(&a.modified));
         Ok(saves)
-    }
-    pub(super) fn db_path(&self, id: &str) -> Result<PathBuf> {
-        if id.len() != 64
-            || !id
-                .bytes()
-                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
-        {
-            return Err(Error::query("Invalid snapshot."));
-        }
-        let path = self.data.join("snapshots").join(format!("{id}.sqlite"));
-        if !path.is_file() {
-            return Err(Error::query("This save has not been imported."));
-        }
-        Ok(path)
     }
 }

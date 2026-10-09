@@ -1,6 +1,5 @@
 use super::archive::check;
 use crate::{Error, Result};
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use tokio_util::sync::CancellationToken;
 
@@ -356,16 +355,7 @@ pub fn abilities(b: &[u8], start: usize, cancel: &CancellationToken) -> Result<V
     Ok(blocks)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Club {
-    pub id: u32,
-    pub uid: u32,
-    pub name: String,
-    pub short_name: String,
-    pub nation: u32,
-    pub offset: usize,
-}
+pub use crate::domain::entities::Club;
 pub fn clubs(b: &[u8], end: usize, cancel: &CancellationToken) -> Result<Vec<Club>> {
     let mut clubs = vec![];
     let mut p = 0;

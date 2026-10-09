@@ -201,7 +201,9 @@ async fn loopback_origins_allow_settings_and_imports_and_reject_foreign_requests
     let games = dir.path().join("games");
     fs::create_dir(&games).unwrap();
     support::archive(&games.join("career.fm"), true, "24.3.0+0", 64);
-    let server = infra::setup::start(0, &dir.path().join("data")).await.unwrap();
+    let server = infra::setup::start(0, &dir.path().join("data"))
+        .await
+        .unwrap();
     let port = server.address.port();
     let client = reqwest::Client::new();
     for host in ["127.0.0.1", "localhost"] {

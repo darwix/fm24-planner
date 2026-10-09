@@ -7,13 +7,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-pub fn check(cancel: &CancellationToken) -> Result<()> {
-    if cancel.is_cancelled() {
-        Err(Error::new("CANCELLED", "Import cancelled"))
-    } else {
-        Ok(())
-    }
-}
+pub use crate::utils::cancel::check;
 
 pub fn decompress(bytes: &[u8], limit: usize, cancel: &CancellationToken) -> Result<Vec<u8>> {
     let mut decoder = zstd::stream::read::Decoder::new(bytes)

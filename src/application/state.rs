@@ -1,50 +1,48 @@
 use crate::{
-    domain::entities::{Job, SaveFile, Settings},
-    parser::{self, archive::check, PARSER_VERSION},
-    storage,
-    infra::config::default_folder,
-    utils::files::{canonical, digest, mtime},
-    Error, Result, VERSION,
+    application::use_cases::ports::{SaveReader, SnapshotStore},
+    domain::entities::{Job, Settings},
+    utils::files::canonical,
+    Error, Result,
 };
-use axum::{
-    body::{to_bytes, Body},
-    extract::State,
-    http::{Request, StatusCode},
-    response::{IntoResponse, Response},
-};
-use chrono::{DateTime, Utc};
 use fs2::FileExt;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
-    time::Instant,
 };
 use tokio_util::sync::CancellationToken;
 
 pub type Completion = Arc<(Mutex<bool>, Condvar)>;
 #[derive(Clone)]
-struct Active {
-    id: String,
-    cancel: CancellationToken,
-    done: Completion,
+pub(crate) struct Active {
+    pub id: String,
+    pub cancel: CancellationToken,
+    pub done: Completion,
 }
-struct Inner {
-    settings: Settings,
-    jobs: BTreeMap<String, Job>,
-    active: Option<Active>,
-    shutting_down: bool,
+pub(crate) struct Inner {
+    pub settings: Settings,
+    pub jobs: BTreeMap<String, Job>,
+    pub active: Option<Active>,
+    pub shutting_down: bool,
 }
-pub struct AppState {
-    data: PathBuf,
-    inner: Mutex<Inner>,
+/// Runtime state shared by the use cases: settings, import jobs and the two ports.
+pub struct Workspace {
+    pub(crate) data: PathBuf,
+    pub(crate) inner: Mutex<Inner>,
+    pub(crate) reader: Arc<dyn SaveReader>,
+    pub(crate) store: Arc<dyn SnapshotStore>,
     _lock: File,
 }
-impl AppState {
-    pub fn open(data: &Path) -> Result<Arc<Self>> {
+impl Workspace {
+    pub fn open(
+        data: &Path,
+        reader: Arc<dyn SaveReader>,
+        store: Arc<dyn SnapshotStore>,
+        default_folder: String,
+    ) -> Result<Arc<Self>> {
         fs::create_dir_all(data)?;
         let data = canonical(data)?;
         let lock = OpenOptions::new()
@@ -77,7 +75,7 @@ impl AppState {
                 .and_then(|p| fs::read(p).ok())
                 .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
                 .and_then(|v| v["folder"].as_str().map(str::to_owned))
-                .unwrap_or_else(default_folder);
+                .unwrap_or(default_folder);
             Settings {
                 folder,
                 last_snapshot: None,
@@ -91,12 +89,14 @@ impl AppState {
                 active: None,
                 shutting_down: false,
             }),
+            reader,
+            store,
             _lock: lock,
         });
         app.persist(&app.inner.lock().unwrap().settings)?;
         Ok(app)
     }
-    fn persist(&self, settings: &Settings) -> Result<()> {
+    pub(crate) fn persist(&self, settings: &Settings) -> Result<()> {
         let mut file = tempfile::NamedTempFile::new_in(&self.data)?;
         file.write_all(&serde_json::to_vec_pretty(settings)?)?;
         file.as_file().sync_all()?;
@@ -105,9 +105,3 @@ impl AppState {
         Ok(())
     }
 }
-
-mod import;
-pub mod routes;
-mod saves;
-pub use import::wait_for;
-pub use routes::{error_response, json_response};

@@ -1,9 +1,14 @@
 use crate::{
+    adapters::{
+        http::app_state::{AppState, Shared},
+        parser::reader::FmSaveReader,
+        persistence::snapshot_store::SqliteSnapshots,
+    },
+    application::{use_cases::wait_for, Workspace},
     infra::{
         app::create_app,
-        config::{AppConfig, Command},
+        config::{default_folder, AppConfig, Command},
     },
-    services::{wait_for, AppState},
     Error, Result, VERSION,
 };
 use serde_json::json;
@@ -13,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 
 pub struct RunningServer {
     pub address: SocketAddr,
-    pub app: Arc<AppState>,
+    pub app: Shared,
     shutdown: CancellationToken,
     task: JoinHandle<std::io::Result<()>>,
 }
@@ -23,7 +28,7 @@ impl RunningServer {
         format!("http://{}", self.address)
     }
     pub async fn shutdown(self) -> Result<()> {
-        let completion = self.app.begin_shutdown();
+        let completion = self.app.saves.begin_shutdown();
         self.shutdown.cancel();
         if let Some(completion) = completion {
             tokio::task::spawn_blocking(move || wait_for(&completion))
@@ -39,7 +44,13 @@ impl RunningServer {
 
 /// Opens the data directory, binds `port` (0 = any), and serves until `shutdown`.
 pub async fn start(port: u16, data: &Path) -> Result<RunningServer> {
-    let app = AppState::open(data)?;
+    let workspace = Workspace::open(
+        data,
+        Arc::new(FmSaveReader),
+        Arc::new(SqliteSnapshots),
+        default_folder(),
+    )?;
+    let app = AppState::new(workspace);
     let listener = TcpListener::bind(("127.0.0.1", port)).await?;
     let address = listener.local_addr()?;
     let router = create_app(app.clone(), address.port());

@@ -1,4 +1,4 @@
-use crate::services::{self, AppState};
+use crate::adapters::http::{app_state::Shared, response::reply, routes::router};
 use axum::{
     body::Body,
     extract::State,
@@ -8,11 +8,10 @@ use axum::{
     Router,
 };
 use serde_json::json;
-use std::sync::Arc;
 
 /// API routes behind the local-only guard. The web app is served by Vite, not by this server.
-pub fn create_app(state: Arc<AppState>, port: u16) -> Router {
-    services::routes::router()
+pub fn create_app(state: Shared, port: u16) -> Router {
+    router()
         .with_state(state)
         .layer(middleware::from_fn_with_state(port, guard))
 }
@@ -26,14 +25,14 @@ async fn guard(State(port): State<u16>, req: Request<Body>, next: Next) -> Respo
         .unwrap_or("");
     let allowed = [format!("127.0.0.1:{port}"), format!("localhost:{port}")];
     if !allowed.iter().any(|a| a == host) {
-        return services::json_response(403, json!({"error":"Invalid host."}));
+        return reply(403, json!({"error":"Invalid host."}));
     }
     if let Some(origin) = req.headers().get("origin") {
         let origin = origin.to_str().unwrap_or("");
         if origin != "http://127.0.0.1:5173"
             && !allowed.iter().any(|h| origin == format!("http://{h}"))
         {
-            return services::json_response(
+            return reply(
                 403,
                 json!({"error":"This app accepts local workspace requests only."}),
             );

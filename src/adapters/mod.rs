@@ -1,2 +1,3 @@
+pub mod http;
 pub mod parser;
-pub mod storage;
+pub mod persistence;

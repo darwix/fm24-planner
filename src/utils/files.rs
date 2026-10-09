@@ -1,6 +1,10 @@
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
-use std::{fs::{self, Metadata}, path::{Path, PathBuf}, time::UNIX_EPOCH};
+use std::{
+    fs::{self, Metadata},
+    path::{Path, PathBuf},
+    time::UNIX_EPOCH,
+};
 
 pub fn mtime(stat: &Metadata) -> Result<f64> {
     Ok(stat

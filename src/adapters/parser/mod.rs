@@ -1,13 +1,14 @@
 pub mod archive;
 pub mod contract;
+pub mod reader;
 pub mod records;
 use crate::{Error, Result};
 use archive::{check, Archive};
 use chrono::{Duration, NaiveDate};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::json;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     path::Path,
     sync::LazyLock,
     time::Instant,
@@ -33,42 +34,7 @@ pub static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../assets/attributes.json")).expect("attribute catalog")
 });
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Player {
-    pub id: u32,
-    pub uid: u32,
-    pub name: String,
-    pub full_name: String,
-    pub age: i32,
-    pub birth_date: String,
-    pub nation_id: u16,
-    pub other_nation_ids: Vec<u32>,
-    pub club_id: Option<u32>,
-    pub club: Option<String>,
-    pub ca: u8,
-    pub pa: u8,
-    pub positions: Vec<String>,
-    pub position_ratings: Vec<u8>,
-    pub attributes: BTreeMap<String, u8>,
-    pub raw_attributes: Vec<u8>,
-    pub wage: Option<u32>,
-    pub contract_end: Option<String>,
-    pub value: Option<u32>,
-    pub source: Value,
-}
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ParsedSave {
-    pub name: String,
-    pub format_version: String,
-    pub game_date: String,
-    pub players: Vec<Player>,
-    pub clubs: Vec<records::Club>,
-    pub managed_club_id: Option<u32>,
-    pub diagnostics: Value,
-    pub warnings: Vec<String>,
-}
+pub use crate::domain::entities::{ParsedSave, Player};
 fn date_of(year: u16, day: u16) -> Result<String> {
     // Match JavaScript's one-based day-of-year rollover for day 366.
     let date = NaiveDate::from_ymd_opt(year as i32, 1, 1)

@@ -11,7 +11,14 @@ fn pstr(s: &str) -> Vec<u8> {
 }
 
 fn club(id: u32, name: &str) -> Club {
-    Club { id, uid: 1000 + id, name: name.into(), short_name: name.into(), nation: 0, offset: 0 }
+    Club {
+        id,
+        uid: 1000 + id,
+        name: name.into(),
+        short_name: name.into(),
+        nation: 0,
+        offset: 0,
+    }
 }
 
 // one reserve-team record followed by a squad of players 1 and 2

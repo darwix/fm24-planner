@@ -13,19 +13,24 @@ export const monthsLeft = (
 };
 
 // index of each UI position in the backend's catalog (GET /api/attributes -> positions)
-// last contract-end date that still counts as expiring (<= 12 months left)
+// last contract-end date that still counts as expiring (<= `months` left)
 // ponytail: month-end game dates (e.g. 31 Jan) can overshoot by a day or two
-const expiryCutoff = (now: string) => {
+const expiryCutoff = (now: string, months: number) => {
   const [y, m, d] = now.split("-").map(Number);
-  return new Date(Date.UTC(y, m + 12, d - 1)).toISOString().slice(0, 10);
+  return new Date(Date.UTC(y, m + months, d - 1)).toISOString().slice(0, 10);
 };
 
+// con: 0 any, -1 expired (free agents), N = contract ends within N months
 export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
-  ...(f.pos && { position: POS_INDEX[f.pos] }),
+  ...(f.pos.length && {
+    mainPosition: f.pos.map((x) => POS_INDEX[x]).join(","),
+  }),
   ageMin: f.min,
   ageMax: f.max,
-  ...(f.exp && { contractEndMax: expiryCutoff(gameDate) }),
+  ...(f.con === -1 && { club: -1 }),
+  ...(f.con > 0 && { contractEndMax: expiryCutoff(gameDate, f.con) }),
   ...(f.val && { valueMax: f.val * 1_000_000 }),
+  ...(f.val && f.con === -1 && { valueUnknown: 1 }),
   sort: "pa",
   limit: 250,
 });

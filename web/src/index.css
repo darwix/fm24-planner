@@ -726,3 +726,142 @@ nav em {
 .cand h3 a:hover {
   text-decoration: underline;
 }
+.brief {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 8px 32px 24px;
+  margin: 12px 0 18px;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 12px 30px #3a301418;
+}
+.brief .q {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px dashed var(--line);
+  align-items: center;
+}
+.brief .q > span b {
+  display: block;
+  font:
+    700 15px Fraunces,
+    serif;
+}
+.brief .q > span small,
+.brief .hint {
+  color: var(--mut);
+}
+.brief .chips {
+  margin: 0;
+}
+.age {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.age input[type="number"] {
+  width: 64px;
+  font: 600 15px Geist;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  text-align: center;
+}
+.age input[type="range"] {
+  accent-color: var(--ink);
+  flex: 1;
+}
+.pw {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+.pitch {
+  position: relative;
+  width: 250px;
+  height: 310px;
+  border-radius: 14px;
+  background: #e7e2d3;
+  box-shadow: inset 0 0 0 1px var(--line);
+  flex: none;
+}
+.pitch:before {
+  content: "";
+  position: absolute;
+  inset: 5%;
+  border: 1.5px solid #c9c2ad;
+  border-radius: 5px;
+}
+.pitch:after {
+  content: "";
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  top: 50%;
+  border-top: 1.5px solid #c9c2ad;
+}
+.sp {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 0;
+  background: var(--card);
+  font: 600 12px Geist;
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 1;
+  box-shadow:
+    0 2px 0 var(--line),
+    0 6px 12px #3a301422;
+  transition: 0.15s;
+}
+.sp:hover {
+  transform: translate(-50%, -54%);
+}
+.sp.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+.brief .hint {
+  font-size: 13px;
+  display: grid;
+  gap: 10px;
+  align-content: center;
+}
+.brief .foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 22px;
+}
+.brief .count {
+  font:
+    700 34px Fraunces,
+    serif;
+  line-height: 1;
+}
+.brief .foot .sub {
+  margin: 0;
+  max-width: 230px;
+}
+.brief .foot .grow {
+  margin-left: auto;
+}
+.brief .chip {
+  border: 0;
+  font: 500 13px Geist;
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 14px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.brief .chip.on {
+  background: var(--ink);
+  color: var(--bg);
+}

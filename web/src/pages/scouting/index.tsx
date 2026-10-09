@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { listIndexState, listsState } from "@/atoms/scoutState";
 import { clubState, squadState } from "@/atoms/squadState";
 import type { PoolPlayer, ScoutFilter } from "@/models/player";
-import { useSearch } from "@/services/save";
+import { useSearchResult } from "@/services/save";
+import Brief from "./brief";
 import { money, wage } from "@/utils/format";
-import { POS_INDEX, scoutQuery, toPool } from "@/utils/player";
+import { scoutQuery, toPool } from "@/utils/player";
 
 export default function Scouting() {
   const nav = useNavigate();
@@ -16,10 +18,12 @@ export default function Scouting() {
   const L = lists[li] ?? lists[0];
   const f = L.f;
   // the backend filters and ranks by potential
-  const found = useSearch(
+  const result = useSearchResult(
     club?.snapshotId,
     club ? scoutQuery(f, club.gameDate) : null,
   );
+  const found = result?.players;
+  const [list, setList] = useState(false);
   if (!club) return <Navigate to="/upload" replace />;
   const rows = (found ?? []).map((p) => toPool(p, club.gameDate));
   const patch = (next: Partial<ScoutFilter>) =>
@@ -84,7 +88,7 @@ export default function Scouting() {
               ...lists,
               {
                 name: "New list",
-                f: { pos: "", min: 16, max: 40, exp: false, val: "" },
+                f: { pos: [], min: 16, max: 40, con: 0, val: "" },
               },
             ]);
             setLi(lists.length);
@@ -111,128 +115,83 @@ export default function Scouting() {
             />
           )}
         </h2>
-        <div className="sub">
-          {found
-            ? `${rows.length} players · top 250 by potential`
-            : "Searching…"}
-          {L.fixed ? " · preset" : ""}
-        </div>
-        <div className="cr">
-          <label>
-            Position
-            <select
-              value={f.pos}
-              onChange={(e) => patch({ pos: e.target.value })}
-            >
-              <option value="">Any</option>
-              {Object.keys(POS_INDEX).map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Age
-            <span>
-              <input
-                type="number"
-                value={f.min}
-                onChange={(e) => patch({ min: +e.target.value })}
-              />{" "}
-              –{" "}
-              <input
-                type="number"
-                value={f.max}
-                onChange={(e) => patch({ max: +e.target.value })}
-              />
-            </span>
-          </label>
-          <label>
-            Max value (£M)
-            <input
-              type="number"
-              value={f.val}
-              placeholder="any"
-              onChange={(e) =>
-                patch({ val: e.target.value === "" ? "" : +e.target.value })
-              }
-            />
-          </label>
-          <label className="ck">
-            <input
-              type="checkbox"
-              checked={f.exp}
-              onChange={(e) => patch({ exp: e.target.checked })}
-            />{" "}
-            Contract expiring (≤12m)
-          </label>
-        </div>
-        <table className="tb">
-          <thead>
-            <tr>
-              <th>PA</th>
-              <th>Name</th>
-              <th>Pos</th>
-              <th>Age</th>
-              <th>From</th>
-              <th>CA</th>
-              <th>Contract</th>
-              <th className="r">Value</th>
-              <th className="r">Wage</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((p) => (
-              <tr
-                key={p.id}
-                className="cl"
-                onClick={() => nav(`/player/${p.id}`)}
-              >
-                <td className="pa">{p.pa}</td>
-                <td>
-                  <b>{p.n}</b>
-                  <br />
-                  <span style={{ color: "var(--mut)", fontSize: 12 }}>
-                    {p.cl}
-                  </span>
-                </td>
-                <td>{p.p}</td>
-                <td>{p.a}</td>
-                <td>{p.nat}</td>
-                <td>{p.ca}</td>
-                <td
-                  style={
-                    p.left !== undefined && p.left <= 12
-                      ? { color: "var(--warn)", fontWeight: 600 }
-                      : undefined
-                  }
-                >
-                  {p.left === undefined ? "n/a" : `${p.left} months`}
-                </td>
-                <td className="r">{money(p.v)}</td>
-                <td className="r">{wage(p.w)}</td>
-                <td className="r">
-                  <button
-                    className="btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToSquad(p);
-                    }}
-                  >
-                    + Add
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {found && !rows.length && (
+        <div className="sub">{L.fixed ? "Preset" : "Custom list"}</div>
+        <Brief
+          f={f}
+          patch={patch}
+          total={result?.total}
+          list={list}
+          onList={() => setList(!list)}
+        />
+        {list && (
+          <table className="tb">
+            <thead>
               <tr>
-                <td colSpan={10} className="sub" style={{ padding: 24 }}>
-                  No players match.
-                </td>
+                <th>PA</th>
+                <th>Name</th>
+                <th>Pos</th>
+                <th>Age</th>
+                <th>From</th>
+                <th>CA</th>
+                <th>Contract</th>
+                <th className="r">Value</th>
+                <th className="r">Wage</th>
+                <th />
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((p) => (
+                <tr
+                  key={p.id}
+                  className="cl"
+                  onClick={() => nav(`/player/${p.id}`)}
+                >
+                  <td className="pa">{p.pa}</td>
+                  <td>
+                    <b>{p.n}</b>
+                    <br />
+                    <span style={{ color: "var(--mut)", fontSize: 12 }}>
+                      {p.cl}
+                    </span>
+                  </td>
+                  <td>{p.p}</td>
+                  <td>{p.a}</td>
+                  <td>{p.nat}</td>
+                  <td>{p.ca}</td>
+                  <td
+                    style={
+                      p.left !== undefined && p.left <= 12
+                        ? { color: "var(--warn)", fontWeight: 600 }
+                        : undefined
+                    }
+                  >
+                    {p.left === undefined ? "n/a" : `${p.left} months`}
+                  </td>
+                  <td className="r">{money(p.v)}</td>
+                  <td className="r">{wage(p.w)}</td>
+                  <td className="r">
+                    <button
+                      className="btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToSquad(p);
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {found && !rows.length && (
+                <tr>
+                  <td colSpan={10} className="sub" style={{ padding: 24 }}>
+                    No players match.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </section>
   );

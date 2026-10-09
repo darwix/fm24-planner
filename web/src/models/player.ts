@@ -44,10 +44,10 @@ export interface Candidate extends Omit<PoolPlayer, "nat"> {
 }
 
 export interface ScoutFilter {
-  pos: string;
+  pos: string[];
   min: number;
   max: number;
-  exp: boolean;
+  con: number;
   val: number | "";
 }
 

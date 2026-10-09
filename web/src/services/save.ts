@@ -37,17 +37,20 @@ export const searchPlayers = async (
   (await api.get(`/api/snapshots/${snap}/players`, { params })).data;
 
 // null params = do not fetch
-export function useSearch(
+export function useSearchResult(
   snap: string | undefined,
   params: Record<string, string | number> | null,
 ) {
-  const { data } = useSWR<ApiPlayer[]>(
+  return useSWR<{ players: ApiPlayer[]; total: number }>(
     snap && params ? [`/api/snapshots/${snap}/players`, params] : null,
     ([url, p]: [string, Record<string, string | number>]) =>
-      api.get(url, { params: p }).then((r) => r.data.players),
-  );
-  return data;
+      api.get(url, { params: p }).then((r) => r.data),
+  ).data;
 }
+export const useSearch = (
+  snap: string | undefined,
+  params: Record<string, string | number> | null,
+) => useSearchResult(snap, params)?.players;
 
 export interface RealPlayer extends ApiPlayer {
   clubId: number;

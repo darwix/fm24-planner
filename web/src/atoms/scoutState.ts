@@ -6,12 +6,12 @@ export const listsState = atom<ScoutList[]>({
   default: [
     {
       name: "Promising youngsters",
-      f: { pos: "", min: 18, max: 23, exp: false, val: "" },
+      f: { pos: [], min: 18, max: 23, con: 0, val: "" },
       fixed: true,
     },
     {
       name: "Contract expiring",
-      f: { pos: "", min: 16, max: 45, exp: true, val: "" },
+      f: { pos: [], min: 16, max: 45, con: 12, val: "" },
       fixed: true,
     },
   ],

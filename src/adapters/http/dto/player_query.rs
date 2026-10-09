@@ -41,14 +41,8 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
         Ok(Some(n as i64))
     };
     let flag = |key: &str| params.get(key).is_some_and(|v| v == "1");
-    let mut filter = PlayerFilter::default();
-    if let Some(q) = params.get("q").map(|s| s.trim()).filter(|s| !s.is_empty()) {
-        if q.encode_utf16().count() > MAX_TEXT_UNITS {
-            return Err(Error::query("Search text is too long."));
-        }
-        filter.text = Some(normalize(q));
-    }
-    for field in ["age", "ca", "pa"] {
+    // `{field}Min` and `{field}Max`, min not above max.
+    let range = |field: &str| -> Result<Range> {
         let range = Range {
             min: integer(&format!("{field}Min"), 0, MAX_SAFE_INTEGER)?,
             max: integer(&format!("{field}Max"), 0, MAX_SAFE_INTEGER)?,
@@ -56,25 +50,38 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
         if range.min.zip(range.max).is_some_and(|(a, b)| a > b) {
             return Err(Error::query(format!("{field} minimum exceeds maximum.")));
         }
-        match field {
-            "age" => filter.age = range,
-            "ca" => filter.ca = range,
-            _ => filter.pa = range,
+        Ok(range)
+    };
+    // A comma list of position indexes; empty when the key is missing.
+    let positions = |key: &str| -> Result<Vec<usize>> {
+        let Some(list) = params.get(key).filter(|s| !s.is_empty()) else {
+            return Ok(vec![]);
+        };
+        list.split(',')
+            .map(|id| {
+                let id = id.trim();
+                id.parse::<usize>()
+                    .ok()
+                    .filter(|i| {
+                        id.bytes().all(|b| b.is_ascii_digit()) && *i < CATALOG.positions.len()
+                    })
+                    .ok_or_else(|| Error::query(format!("Invalid {key}.")))
+            })
+            .collect()
+    };
+    let mut filter = PlayerFilter::default();
+    if let Some(q) = params.get("q").map(|s| s.trim()).filter(|s| !s.is_empty()) {
+        if q.encode_utf16().count() > MAX_TEXT_UNITS {
+            return Err(Error::query("Search text is too long."));
         }
+        filter.text = Some(normalize(q));
     }
+    filter.age = range("age")?;
+    filter.ca = range("ca")?;
+    filter.pa = range("pa")?;
     filter.value_max = integer("valueMax", 0, MAX_SAFE_INTEGER)?;
     filter.value_unknown = flag("valueUnknown");
-    if let Some(list) = params.get("mainPosition").filter(|s| !s.is_empty()) {
-        for id in list.split(',') {
-            let index = id
-                .trim()
-                .parse::<usize>()
-                .ok()
-                .filter(|i| *i < CATALOG.positions.len())
-                .ok_or_else(|| Error::query("Invalid mainPosition."))?;
-            filter.main_positions.push(index);
-        }
-    }
+    filter.main_positions = positions("mainPosition")?;
     if let Some(list) = params.get("excludeIds").filter(|s| !s.is_empty()) {
         filter.exclude_ids = list
             .split(',')
@@ -109,22 +116,10 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
             "Invalid positionMatch. Expected 'and' or 'or'.",
         ));
     }
-    if let Some(positions) = params.get("position").filter(|s| !s.is_empty()) {
-        let mut mask = 0i64;
-        for id in positions.split(',') {
-            let id = id.trim();
-            if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
-                return Err(Error::query("Invalid position."));
-            }
-            let index = id
-                .parse::<usize>()
-                .ok()
-                .filter(|i| *i < CATALOG.positions.len())
-                .ok_or_else(|| Error::query("Invalid position."))?;
-            mask |= 1i64 << index;
-        }
+    let wanted = positions("position")?;
+    if !wanted.is_empty() {
         filter.positions = Some(PositionFilter {
-            mask,
+            mask: wanted.iter().fold(0i64, |mask, i| mask | 1 << i),
             all: position_match == "and",
         });
     }

@@ -370,6 +370,9 @@ fn search_impl(
         clauses.push("contract_end <= ?".into());
         args.push(d.clone().into());
     }
+    if params.get("noContract").is_some_and(|v| v == "1") {
+        clauses.push("contract_end IS NULL".into());
+    }
     if let Some(n) = integer("club", -1, 100000)? {
         if n == -1 {
             clauses.push("club_id IS NULL".into())

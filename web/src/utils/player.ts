@@ -27,7 +27,7 @@ export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
   }),
   ageMin: f.min,
   ageMax: f.max,
-  ...(f.con === -1 && { club: -1 }),
+  ...(f.con === -1 && { club: -1, noContract: 1 }),
   ...(f.con > 0 && { contractEndMax: expiryCutoff(gameDate, f.con) }),
   ...(f.val && { valueMax: f.val * 1_000_000 }),
   ...(f.val && f.con === -1 && { valueUnknown: 1 }),

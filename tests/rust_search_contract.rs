@@ -15,7 +15,8 @@ fn search_filters_contract_end_and_value_in_sql() {
     rusqlite::Connection::open(&dbpath)
         .unwrap()
         .execute_batch(
-            "UPDATE players SET contract_end='2053-06-30', value=4000000 WHERE id=1;
+            "UPDATE players SET value=NULL, contract_end=NULL;
+         UPDATE players SET contract_end='2053-06-30', value=4000000 WHERE id=1;
          UPDATE players SET contract_end='2053-07-01', value=9000000 WHERE id=2;
          UPDATE players SET contract_end='2056-06-30', value=1000000 WHERE id=3;",
         )
@@ -59,7 +60,9 @@ fn unknown_value_and_excluded_ids() {
     let dbpath = snapshot(&dir);
     rusqlite::Connection::open(&dbpath)
         .unwrap()
-        .execute_batch("UPDATE players SET value=1000000; UPDATE players SET value=NULL WHERE id IN (1,2);")
+        .execute_batch(
+            "UPDATE players SET value=1000000; UPDATE players SET value=NULL WHERE id IN (1,2);",
+        )
         .unwrap();
     let db = storage::open_snapshot(&dbpath).unwrap();
     let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
@@ -75,8 +78,9 @@ fn post_body_becomes_the_same_query_as_get() {
     let q = fm_savelens_backend::service::query_from_body(&json!({
         "ageMin": 18, "mainPosition": [3, 12], "valueUnknown": true, "q": "a b", "skip": null,
     }));
-    let pairs: std::collections::HashMap<_, _> =
-        url::form_urlencoded::parse(q.as_bytes()).into_owned().collect();
+    let pairs: std::collections::HashMap<_, _> = url::form_urlencoded::parse(q.as_bytes())
+        .into_owned()
+        .collect();
     assert_eq!(pairs["ageMin"], "18");
     assert_eq!(pairs["mainPosition"], "3,12");
     assert_eq!(pairs["valueUnknown"], "1");

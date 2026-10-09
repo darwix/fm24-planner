@@ -593,6 +593,17 @@ impl AppState {
             ("GET", "/api/rating-systems") => {
                 Ok((200, self.inner.lock().unwrap().rating_library()))
             }
+            ("POST", p) if p.starts_with("/api/snapshots/") && p.ends_with("/players/search") => {
+                // same filters as the GET query string, sent as JSON to avoid URL limits
+                let id = p
+                    .trim_start_matches("/api/snapshots/")
+                    .trim_end_matches("/players/search");
+                let system = self.inner.lock().unwrap().ratings.active().clone();
+                Ok((
+                    200,
+                    self.search_players(id, &query_from_body(&body), &system)?,
+                ))
+            }
             ("POST", "/api/rating-systems/reset") => Ok((200, self.reset_ratings()?)),
             ("POST", "/api/rating-systems") => {
                 let system = self.change_ratings(|next| next.create(&body))?;
@@ -766,6 +777,26 @@ fn error_response(e: Error) -> Response {
     }
     json_response(status, body)
 }
+/// Turns a JSON filter object into the query string the GET search takes.
+/// Arrays become comma lists, booleans 1 or 0, nulls are skipped.
+pub fn query_from_body(body: &Value) -> String {
+    let mut out = url::form_urlencoded::Serializer::new(String::new());
+    for (k, v) in body.as_object().into_iter().flatten() {
+        let text = match v {
+            Value::Null => continue,
+            Value::Bool(b) => (*b as u8).to_string(),
+            Value::String(s) => s.clone(),
+            Value::Array(a) => a
+                .iter()
+                .map(|x| x.as_str().map_or_else(|| x.to_string(), str::to_string))
+                .collect::<Vec<_>>()
+                .join(","),
+            other => other.to_string(),
+        };
+        out.append_pair(k, &text);
+    }
+    out.finish()
+}
 async fn handle(State(state): State<HttpState>, req: Request<Body>) -> Response {
     let host = req
         .headers()
@@ -799,7 +830,10 @@ async fn handle(State(state): State<HttpState>, req: Request<Body>) -> Response 
         let needs_body = (method == "PUT" && path == "/api/settings")
             || (matches!(method.as_str(), "POST" | "PUT")
                 && (path == "/api/rating-systems" || path.starts_with("/api/rating-systems/")))
-            || (method == "POST" && path == "/api/imports");
+            || (method == "POST" && path == "/api/imports")
+            || (method == "POST"
+                && path.starts_with("/api/snapshots/")
+                && path.ends_with("/players/search"));
         let body = if needs_body {
             if !req
                 .headers()
@@ -811,6 +845,8 @@ async fn handle(State(state): State<HttpState>, req: Request<Body>) -> Response 
             }
             let body_limit = if path.starts_with("/api/rating-systems") {
                 4 * 1024 * 1024
+            } else if path.ends_with("/players/search") {
+                256 * 1024
             } else {
                 65536
             };

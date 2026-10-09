@@ -48,11 +48,11 @@ pub fn create_snapshot(
         .join(",");
     db.execute_batch(&format!("CREATE TABLE metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE players (
         id INTEGER PRIMARY KEY,uid INTEGER NOT NULL,name TEXT NOT NULL,full_name TEXT NOT NULL,search_name TEXT NOT NULL,
-        age INTEGER,club_id INTEGER,club TEXT,nation_id INTEGER,nations TEXT NOT NULL,positions TEXT NOT NULL,position_mask INTEGER NOT NULL,
+        age INTEGER,club_id INTEGER,club TEXT,nation_id INTEGER,nations TEXT NOT NULL,positions TEXT NOT NULL,position_mask INTEGER NOT NULL,main_position INTEGER NOT NULL,
         ca INTEGER,pa INTEGER,wage INTEGER,contract_end TEXT,value INTEGER,{attributes},detail TEXT NOT NULL);"))?;
     let tx = db.transaction()?;
     {
-        let placeholders = vec!["?"; 18 + CATALOG.attributes.len()].join(",");
+        let placeholders = vec!["?"; 19 + CATALOG.attributes.len()].join(",");
         let mut insert = tx.prepare(&format!("INSERT INTO players VALUES ({placeholders})"))?;
         for p in &save.players {
             check(cancel)?;
@@ -82,6 +82,16 @@ pub fn create_snapshot(
                         0i64,
                         |mask, (i, v)| if *v >= 15 { mask | (1 << i) } else { mask },
                     )
+                    .into(),
+                // best-rated position (first on ties); the stored `positions` list is catalog order
+                (p.position_ratings
+                    .iter()
+                    .enumerate()
+                    .fold(
+                        (0usize, 0u8),
+                        |best, (i, v)| if *v > best.1 { (i, *v) } else { best },
+                    )
+                    .0 as i64)
                     .into(),
                 (p.ca as i64).into(),
                 (p.pa as i64).into(),
@@ -303,8 +313,42 @@ fn search_impl(
         }
     }
     if let Some(n) = integer("valueMax", 0, 9_007_199_254_740_991)? {
-        clauses.push("value <= ?".into());
+        // unknown values stay in only when asked, e.g. free agents have none
+        if params.get("valueUnknown").is_some_and(|v| v == "1") {
+            clauses.push("(value <= ? OR value IS NULL)".into());
+        } else {
+            clauses.push("value <= ?".into());
+        }
         args.push(n.into());
+    }
+    if let Some(list) = params.get("mainPosition").filter(|s| !s.is_empty()) {
+        let mut marks = vec![];
+        for id in list.split(',') {
+            let i = id
+                .trim()
+                .parse::<usize>()
+                .ok()
+                .filter(|i| *i < CATALOG.positions.len())
+                .ok_or_else(|| Error::query("Invalid mainPosition."))?;
+            marks.push("?");
+            args.push((i as i64).into());
+        }
+        clauses.push(format!("main_position IN ({})", marks.join(",")));
+    }
+    if let Some(list) = params.get("excludeIds").filter(|s| !s.is_empty()) {
+        let ids = list
+            .split(',')
+            .map(|id| {
+                id.trim()
+                    .parse::<u32>()
+                    .map_err(|_| Error::query("Invalid excludeIds."))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        if ids.len() > 5000 {
+            return Err(Error::query("Too many excludeIds."));
+        }
+        clauses.push(format!("id NOT IN ({})", vec!["?"; ids.len()].join(",")));
+        args.extend(ids.into_iter().map(|id| SqlValue::from(id as i64)));
     }
     if let Some(d) = params.get("contractEndMax").filter(|s| !s.is_empty()) {
         let b = d.as_bytes();

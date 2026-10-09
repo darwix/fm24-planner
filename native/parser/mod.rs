@@ -14,7 +14,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-pub const PARSER_VERSION: &str = "fm24-rust-6-fm";
+pub const PARSER_VERSION: &str = "fm24-rust-7-fm";
 #[derive(Deserialize, Serialize)]
 pub struct Attribute {
     pub key: String,

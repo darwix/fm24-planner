@@ -1,5 +1,5 @@
 use crate::{
-    application::use_cases::{ports::SaveFiles, Session},
+    application::{session::Session, use_cases::ports::SaveFiles},
     domain::entities::{Job, Settings},
     Error, Result,
 };

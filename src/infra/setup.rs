@@ -6,7 +6,10 @@ use crate::{
             FsSaveFiles, JsonSettingsRepository, SqlitePlayerRepository, SqliteSnapshotRepository,
         },
     },
-    application::use_cases::{PlayerUseCase, SaveUseCase, Session, SettingsUseCase},
+    application::{
+        session::Session,
+        use_cases::{PlayerUseCase, SaveUseCase, SettingsUseCase},
+    },
     infra::{config::default_folder, data_dir::DataDir},
     Result,
 };

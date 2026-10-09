@@ -1,9 +1,8 @@
 use crate::utils::cancel::CancelFlag;
 use crate::{
-    application::use_cases::{
+    application::{
         session::{Active, Completion, Inner},
-        snapshot_builder::build_snapshot,
-        SaveUseCase,
+        use_cases::{snapshot_builder::build_snapshot, SaveUseCase},
     },
     domain::entities::{Job, JobStatus, SaveFile, SnapshotId, SnapshotMeta},
     utils::cancel::check,

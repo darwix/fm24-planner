@@ -1,7 +1,7 @@
 use crate::{
-    application::use_cases::{
-        ports::{SaveFiles, SaveReader, SnapshotRepository},
-        Session,
+    application::{
+        session::Session,
+        use_cases::ports::{SaveFiles, SaveReader, SnapshotRepository},
     },
     domain::entities::{SaveFile, SnapshotId, SnapshotMeta},
     utils::files::digest,

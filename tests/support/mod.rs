@@ -158,7 +158,10 @@ pub fn save_use_case(
             parser::reader::FmSaveReader,
             persistence::{FsSaveFiles, SqliteSnapshotRepository},
         },
-        application::use_cases::{ports::SettingsRepository, SaveUseCase, Session},
+        application::{
+            session::Session,
+            use_cases::{ports::SettingsRepository, SaveUseCase},
+        },
         domain::entities::Settings,
     };
     use std::sync::Arc;

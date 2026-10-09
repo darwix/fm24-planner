@@ -25,13 +25,13 @@ src/
 │   ├── catalog.rs          attributes and positions every player is rated on
 │   └── countries.rs        nation id to name
 ├── application/            what the app does
+│   ├── session.rs          in-memory state: settings, import jobs, shutdown flag
 │   └── use_cases/
 │       ├── ports.rs        traits the adapters implement
 │       ├── saves.rs        SaveUseCase: list saves, snapshot metadata
 │       ├── imports.rs      SaveUseCase: start, run, cancel an import
 │       ├── players.rs      PlayerUseCase: search and read players
 │       ├── settings.rs     SettingsUseCase: save folder
-│       ├── session.rs      in-memory state: settings, import jobs, shutdown flag
 │       └── snapshot_builder.rs   derived columns and metadata of a snapshot
 ├── adapters/
 │   ├── http/               axum: routes, dto, error mapping, AppState

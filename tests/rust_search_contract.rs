@@ -75,7 +75,7 @@ fn unknown_value_and_excluded_ids() {
 
 #[test]
 fn post_body_becomes_the_same_query_as_get() {
-    let q = fm_savelens_backend::service::query_from_body(&json!({
+    let q = fm_savelens_backend::utils::query::query_from_body(&json!({
         "ageMin": 18, "mainPosition": [3, 12], "valueUnknown": true, "q": "a b", "skip": null,
     }));
     let pairs: std::collections::HashMap<_, _> = url::form_urlencoded::parse(q.as_bytes())

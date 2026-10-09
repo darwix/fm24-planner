@@ -85,19 +85,12 @@ fn position_queries_match_shared_boundaries_validation_and_pagination() {
 }
 
 #[test]
-fn positions_combine_with_club_attributes_and_role_ratings_before_counting() {
+fn positions_combine_with_club_and_attributes_before_counting() {
     let (_dir, db) = snapshot();
-    let query = "position=2,4&club=1&attr_pace=16&role=cd-defend&roleMin=82&sort=roleRating";
+    let query = "position=2,4&club=1&attr_pace=16";
     let and = storage::search(&db, query).unwrap();
-    assert_eq!(and["total"], 0);
+    assert_eq!(and["total"], 1);
+    assert_eq!(ids(&and), json!([1]));
     let or = storage::search(&db, &format!("{query}&positionMatch=or")).unwrap();
-    assert_eq!(or["total"], 1);
-    assert_eq!(ids(&or), json!([2]));
-    assert_eq!(or["players"][0]["roleRating"], 85.0);
-    let query = "position=2,4&positionMatch=or&role=cd-defend&roleMin=80&sort=roleRating&limit=1";
-    for (page, expected) in [(1, 5), (2, 2), (3, 1)] {
-        let result = storage::search(&db, &format!("{query}&page={page}")).unwrap();
-        assert_eq!(result["total"], 3);
-        assert_eq!(ids(&result), json!([expected]));
-    }
+    assert_eq!(or["total"], 2);
 }

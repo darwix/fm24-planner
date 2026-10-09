@@ -1,7 +1,7 @@
 mod support;
 use fm_savelens_backend::{
     parser::{archive::Archive, parse_save, CATALOG, PARSER_VERSION},
-    service, storage,
+    storage,
 };
 use serde_json::json;
 use std::fs;
@@ -18,7 +18,7 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
     file.set_times(fs::FileTimes::new().set_modified(modified))
         .unwrap();
     let stat = file.metadata().unwrap();
-    let source_mtime = service::mtime(&stat).unwrap();
+    let source_mtime = fm_savelens_backend::utils::files::mtime(&stat).unwrap();
     let cancel = CancellationToken::new();
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let dbpath = dir.path().join("snapshot.sqlite");
@@ -123,7 +123,7 @@ fn compressed_and_plain_records_match_and_query_correctly() {
 
 #[test]
 fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
-    use fm_savelens_backend::{parser::PARSER_VERSION, service::mtime};
+    use fm_savelens_backend::{parser::PARSER_VERSION, utils::files::mtime};
     use rusqlite::Connection;
     use serde_json::Value;
     use std::time::{Duration, UNIX_EPOCH};

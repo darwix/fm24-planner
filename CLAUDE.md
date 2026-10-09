@@ -13,7 +13,7 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 
 ## Status: React app on a patched SaveLens backend (real wage, contract end, value)
 
-**Layout**: the repo root is the SaveLens clone (Rust in `src/` (`domain/`, `adapters/` = parser + storage, `services/`, `error.rs`), `tests/`; no desktop app, browser only), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; Vite builds to `web/dist/client`, which the Rust server embeds). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
+**Layout**: the repo root is the SaveLens clone (Rust in `src/` (`domain/`, `adapters/` = parser + storage, `services/`, `error.rs`), `tests/`; no desktop app, browser only), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; served by Vite, the Rust server is API-only and no longer embeds the build). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
 
 `web/src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to a SaveLens server on :4242.
 
@@ -86,3 +86,7 @@ Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` 
 - `agent-browser` is headless by default; use `--headed` to watch. Element refs change after each click, so re-snapshot first.
 - Vitest: a `beforeEach` that returns a mock runs it as a cleanup hook; use braces. `src/services/save.test.ts` holds the API client tests, so new service tests go in their own file.
 - CSS class `.up` is the delta colour in `a-board.html`; do not reuse it for layout.
+
+## Commits
+
+Use semantic (Conventional Commits) messages: `type(scope): subject`, with type one of `feat`, `fix`, `test`, `refactor`, `docs`, `chore`, `style`, `perf`, `ci`. Imperative subject, no trailing period.

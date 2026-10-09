@@ -4,12 +4,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use tokio_util::sync::CancellationToken;
 
-pub fn u32(b: &[u8], p: usize) -> u32 {
-    u32::from_le_bytes(b[p..p + 4].try_into().unwrap())
-}
-pub fn u16(b: &[u8], p: usize) -> u16 {
-    u16::from_le_bytes(b[p..p + 2].try_into().unwrap())
-}
+pub use crate::utils::bytes::{u16, u32};
 fn text(b: &[u8]) -> Option<String> {
     let s = std::str::from_utf8(b).ok()?;
     if s.chars().any(|c| c <= '\u{1f}' || c == '\u{fffd}') {

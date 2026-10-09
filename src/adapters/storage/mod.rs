@@ -11,11 +11,7 @@ use std::{
     sync::LazyLock,
 };
 use tokio_util::sync::CancellationToken;
-use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
-
-mod search_cache;
-use search_cache::OrderCache;
-pub use search_cache::SearchSession;
+use crate::utils::text::normalize;
 
 static COUNTRIES: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../assets/nations.json")).expect("country catalog")
@@ -25,12 +21,6 @@ pub fn nation_name(id: u32) -> String {
         .get(&id.to_string())
         .cloned()
         .unwrap_or_else(|| format!("Nation {id}"))
-}
-pub fn normalize(s: &str) -> String {
-    s.nfd()
-        .filter(|c| !is_combining_mark(*c))
-        .collect::<String>()
-        .to_lowercase()
 }
 
 pub fn create_snapshot(
@@ -177,58 +167,21 @@ pub fn metadata(db: &Connection) -> Result<Value> {
     m["stale"] = json!(
         std::fs::metadata(m["sourcePath"].as_str().unwrap_or("")).map_or(true, |s| {
             s.len() != m["sourceSize"].as_u64().unwrap_or(0)
-                || crate::service::mtime(&s).ok() != m["sourceMtime"].as_f64()
+                || crate::utils::files::mtime(&s).ok() != m["sourceMtime"].as_f64()
                 || m["parserVersion"].as_str() != Some(PARSER_VERSION)
         })
     );
     Ok(m)
 }
 pub fn player(db: &Connection, id: u32) -> Result<Value> {
-    player_with_system(db, id, &crate::rating_systems::BUILTIN)
-}
-pub fn player_with_system(
-    db: &Connection,
-    id: u32,
-    system: &crate::rating_systems::RatingSystem,
-) -> Result<Value> {
     use rusqlite::OptionalExtension;
     let raw: Option<String> = db
         .query_row("SELECT detail FROM players WHERE id=?", [id], |r| r.get(0))
         .optional()?;
     let raw = raw.ok_or_else(|| Error::new("NOT_FOUND", "Player not found."))?;
-    let mut detail: Value = serde_json::from_str(&raw)?;
-    detail["roleRatings"] = json!(system
-        .roles
-        .iter()
-        .map(|role| system.rate_role(role, &detail["attributes"]))
-        .collect::<Vec<_>>());
-    system.tag(&mut detail);
-    Ok(detail)
+    Ok(serde_json::from_str(&raw)?)
 }
 pub fn search(db: &Connection, query: &str) -> Result<Value> {
-    search_with_system(db, query, &crate::rating_systems::BUILTIN)
-}
-pub fn search_with_system(
-    db: &Connection,
-    query: &str,
-    system: &crate::rating_systems::RatingSystem,
-) -> Result<Value> {
-    search_impl(db, query, system, None)
-}
-
-fn search_impl(
-    db: &Connection,
-    query: &str,
-    system: &crate::rating_systems::RatingSystem,
-    mut cache: Option<&mut OrderCache>,
-) -> Result<Value> {
-    let score_sql = |role: &crate::roles::Role| {
-        if cache.is_some() {
-            search_cache::score_column(system, role)
-        } else {
-            role.sql_score()
-        }
-    };
     let mut params = HashMap::new();
     for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
         params.entry(k.into_owned()).or_insert(v.into_owned());
@@ -251,38 +204,6 @@ fn search_impl(
     };
     let mut clauses = vec![];
     let mut args: Vec<SqlValue> = vec![];
-    let role = params
-        .get("role")
-        .filter(|s| !s.is_empty())
-        .map(|id| system.find(id))
-        .transpose()?;
-    let score_expression = role.map(score_sql);
-    let mut displayed_roles = vec![];
-    if let Some(ids) = params.get("roles").filter(|s| !s.is_empty()) {
-        for id in ids.split(',') {
-            let displayed = system.find(id)?;
-            if !displayed_roles
-                .iter()
-                .any(|r: &&crate::roles::Role| r.id == displayed.id)
-            {
-                displayed_roles.push(displayed);
-            }
-        }
-    }
-    if let Some(min) = params.get("roleMin").filter(|s| !s.is_empty()) {
-        let expression = score_expression
-            .as_ref()
-            .ok_or_else(|| Error::query("Select a role before setting a minimum role rating."))?;
-        let min = min
-            .trim()
-            .parse::<f64>()
-            .map_err(|_| Error::query("Invalid roleMin."))?;
-        if !min.is_finite() || !(0.0..=100.0).contains(&min) {
-            return Err(Error::query("Invalid roleMin."));
-        }
-        clauses.push(format!("{expression} >= ?"));
-        args.push(min.into());
-    }
     if let Some(q) = params.get("q").map(|s| s.trim()).filter(|s| !s.is_empty()) {
         if q.encode_utf16().count() > 200 {
             return Err(Error::query("Search text is too long."));
@@ -433,17 +354,6 @@ fn search_impl(
         "name" => "name COLLATE NOCASE".into(),
         "club" => "club COLLATE NOCASE".into(),
         "age" | "ca" | "pa" => sort.to_string(),
-        "bestRoleRating" if cache.is_some() => {
-            "(SELECT score FROM session.best WHERE id=players.id)".into()
-        }
-        "bestRoleRating" => best_role_expression(system),
-        "roleRating" => {
-            if role.is_none() {
-                return Err(Error::query("Select a role before sorting by role rating."));
-            }
-            score_expression.clone().unwrap()
-        }
-        key if key.starts_with("role:") => score_sql(system.find(&key[5..])?),
         key if CATALOG.attributes.iter().any(|a| a.key == key) => format!("attr_{key}"),
         _ => return Err(Error::query("Unsupported sort column.")),
     };
@@ -457,281 +367,32 @@ fn search_impl(
     }
     let page = integer("page", 1, 100000)?.unwrap_or(1);
     let limit = integer("limit", 1, 250)?.unwrap_or(100);
-    let include_best_role = integer("bestRole", 0, 1)? == Some(1);
-    let include_reverse = integer("includeReversePage", 0, 1)? == Some(1);
     let condition = if clauses.is_empty() {
         String::new()
     } else {
         format!("WHERE {}", clauses.join(" AND "))
     };
-    let score_select = score_expression.as_deref().unwrap_or("NULL");
-    let null_order = if matches!(sort, "roleRating" | "bestRoleRating") || sort.starts_with("role:")
-    {
-        " NULLS LAST"
-    } else {
-        ""
-    };
-    let (total, selection) = if let Some(orders) = cache.as_deref_mut() {
-        let order = orders.get(db, &condition, &args, &column, !null_order.is_empty())?;
-        let ids = order.page(direction == "desc", page, limit);
-        args.clear();
-        // IDs originate in SQLite, never in user input. Ordinals preserve the
-        // cached order without sorting the full player set again.
-        let selection = if ids.is_empty() {
-            "WHERE 0".to_string()
-        } else {
-            let values = ids
-                .iter()
-                .enumerate()
-                .map(|(i, id)| format!("({id},{i})"))
-                .collect::<Vec<_>>()
-                .join(",");
-            format!("JOIN (SELECT column1 AS selected_id,column2 AS ordinal FROM (VALUES {values})) selected ON selected_id=players.id ORDER BY ordinal")
-        };
-        (order.len() as i64, selection)
-    } else {
-        let total: i64 = db.query_row(
-            &format!("SELECT COUNT(*) FROM players {condition}"),
-            params_from_iter(&args),
-            |r| r.get(0),
-        )?;
-        args.extend([limit.into(), ((page - 1) * limit).into()]);
-        (total, format!("{condition} ORDER BY {column} {direction}{null_order}, ca DESC, id ASC LIMIT ? OFFSET ?"))
-    };
-    let mut stmt=db.prepare(&format!("SELECT id,uid,name,age,club_id,club,nations,positions,ca,pa,{score_select} AS roleRating,wage,contract_end,value FROM players {selection}"))?;
-    let rows = stmt.query_map(params_from_iter(&args), |r| {
-        Ok((
-            r.get::<_, u32>(0)?,
-            r.get::<_, u32>(1)?,
-            r.get::<_, String>(2)?,
-            r.get::<_, i32>(3)?,
-            r.get::<_, Option<u32>>(4)?,
-            r.get::<_, Option<String>>(5)?,
-            r.get::<_, String>(6)?,
-            r.get::<_, String>(7)?,
-            r.get::<_, u8>(8)?,
-            r.get::<_, u8>(9)?,
-            r.get::<_, Option<f64>>(10)?,
-            r.get::<_, Option<u32>>(11)?,
-            r.get::<_, Option<String>>(12)?,
-            r.get::<_, Option<u32>>(13)?,
-        ))
-    })?;
-    let mut players = vec![];
-    for row in rows {
-        let (
-            id,
-            uid,
-            name,
-            age,
-            club_id,
-            club,
-            nations,
-            positions,
-            ca,
-            pa,
-            role_rating,
-            wage,
-            contract_end,
-            value,
-        ) = row?;
-        let nations: Vec<u32> = serde_json::from_str(&nations)?;
-        let positions: Value = serde_json::from_str(&positions)?;
-        let mut player = json!({"id":id,"uid":uid,"name":name,"age":age,"club_id":club_id,"club":club,"nationalities":nations.into_iter().map(nation_name).collect::<Vec<_>>(),"positions":positions,"ca":ca,"pa":pa,"wage":wage,"contractEnd":contract_end,"value":value});
-        if role.is_some() {
-            player["roleRating"] = json!(role_rating);
-        }
-        players.push(player);
-    }
-    // Hydrate only this page's displayed scores. A session reads materialized
-    // values; the uncached reference path evaluates the original expressions.
-    let score_roles = if include_best_role && cache.is_none() {
-        system.roles.iter().collect::<Vec<_>>()
-    } else {
-        displayed_roles.clone()
-    };
-    if !score_roles.is_empty() && !players.is_empty() {
-        let placeholders = vec!["?"; players.len()].join(",");
-        let ids = players
-            .iter()
-            .map(|p| p["id"].as_u64().unwrap() as i64)
-            .collect::<Vec<_>>();
-        let mut by_player: HashMap<u32, Value> = HashMap::new();
-        // Bound SQL column counts even when a custom system adds many profiles.
-        for batch in score_roles.chunks(64) {
-            let expressions = batch
-                .iter()
-                .map(|r| {
-                    if cache.is_some() {
-                        search_cache::score_column(system, r)
-                    } else {
-                        r.sql_score()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-            let mut scores = db.prepare(&format!(
-                "SELECT id,{expressions} FROM players WHERE id IN ({placeholders})"
-            ))?;
-            let rows = scores.query_map(params_from_iter(&ids), |row| {
-                let mut values = serde_json::Map::new();
-                for (i, role) in batch.iter().enumerate() {
-                    values.insert(role.id.clone(), json!(row.get::<_, Option<f64>>(i + 1)?));
-                }
-                Ok((row.get::<_, u32>(0)?, values))
-            })?;
-            for row in rows {
-                let (id, values) = row?;
-                by_player
-                    .entry(id)
-                    .or_insert_with(|| json!({}))
-                    .as_object_mut()
-                    .unwrap()
-                    .extend(values);
-            }
-        }
-        if !displayed_roles.is_empty() {
-            attach_role_scores(&mut players, &by_player, &displayed_roles);
-        }
-        if include_best_role && cache.is_none() {
-            for player in &mut players {
-                let id = player["id"].as_u64().unwrap() as u32;
-                player["bestRole"] = best_role(by_player.get(&id));
-            }
-        }
-    }
-    if include_best_role && cache.is_some() {
-        let mut best = db.prepare("SELECT role_id,score FROM session.best WHERE id=?")?;
-        for player in &mut players {
-            player["bestRole"] = best.query_row([player["id"].as_u64().unwrap()], |row| {
-                let role_id: Option<String> = row.get(0)?;
-                let score: Option<f64> = row.get(1)?;
-                Ok(role_id.map_or(
-                    Value::Null,
-                    |role_id| json!({"roleId":role_id,"score":score}),
-                ))
-            })?;
-        }
-    }
-    let mut result = json!({"total":total,"page":page,"limit":limit,"players":players});
-    system.tag(&mut result);
-    if include_reverse {
-        let reverse_direction = if direction == "asc" { "desc" } else { "asc" };
-        params.insert("includeReversePage".into(), "0".into());
-        params.insert("page".into(), "1".into());
-        params.insert("direction".into(), reverse_direction.into());
-        let reverse_query = url::form_urlencoded::Serializer::new(String::new())
-            .extend_pairs(&params)
-            .finish();
-        result["reversePage"] = search_impl(db, &reverse_query, system, cache)?;
-    }
-    Ok(result)
+    let total: i64 = db.query_row(
+        &format!("SELECT COUNT(*) FROM players {condition}"),
+        params_from_iter(&args),
+        |r| r.get(0),
+    )?;
+    args.extend([limit.into(), ((page - 1) * limit).into()]);
+    let mut stmt = db.prepare(&format!("SELECT id,uid,name,age,club_id,club,nations,positions,ca,pa,wage,contract_end,value FROM players {condition} ORDER BY {column} {direction}, ca DESC, id ASC LIMIT ? OFFSET ?"))?;
+    let players = stmt
+        .query_map(params_from_iter(&args), |r| {
+            let nations: String = r.get(6)?;
+            let positions: String = r.get(7)?;
+            Ok(json!({
+                "id": r.get::<_, u32>(0)?, "uid": r.get::<_, u32>(1)?, "name": r.get::<_, String>(2)?,
+                "age": r.get::<_, i32>(3)?, "club_id": r.get::<_, Option<u32>>(4)?, "club": r.get::<_, Option<String>>(5)?,
+                "nationalities": serde_json::from_str::<Vec<u32>>(&nations).unwrap_or_default().into_iter().map(nation_name).collect::<Vec<_>>(),
+                "positions": serde_json::from_str::<Value>(&positions).unwrap_or(Value::Null),
+                "ca": r.get::<_, u8>(8)?, "pa": r.get::<_, u8>(9)?, "wage": r.get::<_, Option<u32>>(10)?,
+                "contractEnd": r.get::<_, Option<String>>(11)?, "value": r.get::<_, Option<u32>>(12)?,
+            }))
+        })?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(json!({"total":total,"page":page,"limit":limit,"players":players}))
 }
 
-fn best_role_expression(system: &crate::rating_systems::RatingSystem) -> String {
-    // Ratings are positive; -1 lets scalar MAX ignore unavailable roles.
-    // Balanced batches avoid function-argument and expression-depth limits.
-    let mut expressions = system
-        .roles
-        .iter()
-        .map(|role| format!("COALESCE({}, -1)", role.sql_score()))
-        .collect::<Vec<_>>();
-    while expressions.len() > 1 {
-        expressions = expressions
-            .chunks(32)
-            .map(|batch| {
-                if batch.len() == 1 {
-                    batch[0].clone()
-                } else {
-                    format!("MAX({})", batch.join(","))
-                }
-            })
-            .collect();
-    }
-    format!(
-        "NULLIF({}, -1)",
-        expressions.first().map(String::as_str).unwrap_or("-1")
-    )
-}
-
-fn best_role(scores: Option<&Value>) -> Value {
-    scores
-        .and_then(Value::as_object)
-        .and_then(|scores| {
-            scores
-                .iter()
-                .filter_map(|(id, score)| score.as_f64().map(|score| (id, score)))
-                .max_by(|(a_id, a), (b_id, b)| a.total_cmp(b).then_with(|| b_id.cmp(a_id)))
-        })
-        .map_or(
-            Value::Null,
-            |(id, score)| json!({"roleId": id, "score": score}),
-        )
-}
-
-fn attach_role_scores(
-    players: &mut [Value],
-    by_player: &HashMap<u32, Value>,
-    displayed_roles: &[&crate::roles::Role],
-) {
-    for player in players {
-        let id = player["id"].as_u64().unwrap() as u32;
-        player["roleScores"] = Value::Object(
-            displayed_roles
-                .iter()
-                .map(|role| {
-                    (
-                        role.id.clone(),
-                        by_player
-                            .get(&id)
-                            .and_then(|scores| scores.get(&role.id))
-                            .cloned()
-                            .unwrap_or(Value::Null),
-                    )
-                })
-                .collect(),
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn best_role_keeps_precision_and_breaks_exact_ties_by_id() {
-        assert_eq!(
-            best_role(Some(
-                &json!({"af-attack":85.41,"ap-support":85.44,"cd-defend":null})
-            )),
-            json!({"roleId":"ap-support","score":85.44})
-        );
-        assert_eq!(
-            best_role(Some(&json!({"ap-support":85.44,"af-attack":85.44}))),
-            json!({"roleId":"af-attack","score":85.44})
-        );
-        assert_eq!(best_role(Some(&json!({"af-attack":null}))), Value::Null);
-        assert_eq!(best_role(None), Value::Null);
-    }
-
-    #[test]
-    fn missing_role_score_rows_preserve_players_and_return_null_for_every_requested_role() {
-        let roles = [
-            crate::roles::find("af-attack").unwrap(),
-            crate::roles::find("tf-support").unwrap(),
-        ];
-        let scores = json!({"af-attack": 78.54321, "tf-support": null});
-        let by_player = HashMap::from([(7, scores.clone())]);
-        let mut players = vec![json!({"id": 8, "name": "Missing"}), json!({"id": 7})];
-
-        attach_role_scores(&mut players, &by_player, &roles);
-
-        assert_eq!(
-            players,
-            vec![
-                json!({"id": 8, "name": "Missing", "roleScores": {"af-attack": null, "tf-support": null}}),
-                json!({"id": 7, "roleScores": scores}),
-            ]
-        );
-    }
-}

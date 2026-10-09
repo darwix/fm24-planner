@@ -22,7 +22,6 @@ rusqlite = { version = "0.37", features = ["bundled", "hooks"] }
 serde = { version = "1", features = ["derive"] }
 # Snapshot timestamps must survive JSON deserialization without rounding.
 serde_json = { version = "1", features = ["float_roundtrip"] }
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 sha2 = "0.10"
 tempfile = "3"
 thiserror = "2"
@@ -32,6 +31,10 @@ unicode-normalization = "0.1"
 url = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 zstd = "0.13"
+
+[dev-dependencies]
+# Only the API tests make HTTP requests.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
 [profile.release]
 lto = "thin"

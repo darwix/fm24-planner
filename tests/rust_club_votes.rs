@@ -1,5 +1,5 @@
 // A team whose own record names no club still has players whose contract names one (Fram's 19432).
-use fm_savelens_backend::adapters::parser::records::club_by_contract;
+use fm_savelens_backend::adapters::parser::teams::club_by_contract;
 use std::collections::HashSet;
 
 fn clubs() -> HashSet<u32> {

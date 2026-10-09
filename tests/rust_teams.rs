@@ -1,6 +1,6 @@
 // Reserve/youth team records carry their own name instead of the ten zero bytes; they must still link to a club.
-use fm_savelens_backend::adapters::parser::records::{teams, Club};
 use fm_savelens_backend::utils::cancel::CancelFlag;
+use fm_savelens_backend::{adapters::parser::teams, domain::entities::Club};
 use std::collections::HashSet;
 
 fn pstr(s: &str) -> Vec<u8> {
@@ -45,7 +45,7 @@ fn save(owner: u32, name: &str) -> Vec<u8> {
 
 fn run(b: &[u8], clubs: &[Club]) -> Vec<(Option<u32>, u32, Vec<u32>)> {
     let valid: HashSet<u32> = [1, 2].into();
-    teams(b, clubs, b.len(), &valid, &CancelFlag::new())
+    teams::find(b, clubs, b.len(), &valid, &CancelFlag::new())
         .unwrap()
         .into_iter()
         .map(|t| (t.club, t.ordinal, t.members))

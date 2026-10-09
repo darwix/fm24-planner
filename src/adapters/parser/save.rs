@@ -1,6 +1,7 @@
 use super::{
+    abilities,
     archive::{check, Archive},
-    contract, records,
+    bytes, clubs, contract, names, people, teams,
 };
 use crate::utils::cancel::CancelFlag;
 use crate::{
@@ -54,7 +55,7 @@ pub fn parse_save(
             "The player database header is incomplete.",
         ));
     }
-    let (day, year) = (records::u16(&b, 36) & 511, records::u16(&b, 38));
+    let (day, year) = (bytes::u16(&b, 36) & 511, bytes::u16(&b, 38));
     if !(1..=366).contains(&day) || !(2020..=2300).contains(&year) {
         return Err(Error::new(
             "UNSUPPORTED_DATE",
@@ -63,11 +64,11 @@ pub fn parse_save(
     }
     let game_date = date_of(year, day)?;
     progress(23, "Resolving player names");
-    let names = records::names(&b, cancel)?;
+    let pools = names::find(&b, cancel)?;
     progress(35, "Reading player records");
-    let people = records::people(&b, &names, cancel)?;
+    let people = people::find(&b, &pools, cancel)?;
     progress(52, "Reading ability and attributes");
-    let blocks = records::abilities(&b, names.end, cancel)?;
+    let blocks = abilities::find(&b, pools.end, cancel)?;
     let mut linked = vec![];
     let (mut ix, mut ambiguous, mut unbound) = (0, 0, 0);
     for person in &people {
@@ -82,19 +83,19 @@ pub fn parse_save(
             ambiguous += 1;
             continue;
         }
-        if person.id < 0 || blocks[first].owner_id != person.id as u64 {
+        if person.id < 0 || blocks[first].person_id != person.id as u64 {
             unbound += 1;
             continue;
         }
         linked.push((person, &blocks[first]));
     }
     progress(68, "Resolving clubs and squads");
-    let clubs = records::clubs(&b, names.start, cancel)?;
+    let clubs = clubs::find(&b, pools.start, cancel)?;
     let club_map: HashMap<_, _> = clubs.iter().map(|c| (c.id, c)).collect();
-    let teams = records::teams(
+    let teams = teams::find(
         &b,
         &clubs,
-        names.start,
+        pools.start,
         &people
             .iter()
             .filter(|p| p.id >= 0)
@@ -154,7 +155,7 @@ pub fn parse_save(
             source: json!({"person":p.offset,"ability":ability.offset,"identity":p.identity_offset}) });
     }
     // Reserve/youth teams whose record names no club: take the club their players are contracted to.
-    let team_club = records::club_by_contract(&clubless, &club_map.keys().copied().collect());
+    let team_club = teams::club_by_contract(&clubless, &club_map.keys().copied().collect());
     for (p, team) in players.iter_mut().zip(&player_team) {
         if let (None, Some(&id)) = (p.club_id, team_club.get(team)) {
             p.club_id = Some(id);

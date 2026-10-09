@@ -19,7 +19,24 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 
 The shipped SaveLens exe does not expose contract data, so the SaveLens clone (now the repo root) is patched: `src/adapters/parser/contract.rs` reads weekly wage (GBP, before tax), contract end and value (GBP) from the save; the search API returns `wage`, `contractEnd`, `value`. Build and run it instead of the shipped exe: `cargo build --release --bin fm-savelens-24-server` (from the root), then `target/release/fm-savelens-24-server.exe --no-open --port 4242`. Tests: `cargo test --release` (fixtures in `tests/fixtures`, real bytes of four players). Layout notes: wage = u32 after `[eid][team][00 x4]`, contract end = `(day,year)` 12 bytes after the u32 before an `FF FF FF FF` run, value = u32 right after the 54-byte attribute block. Not decoded: transfer-listed, loan-listed, sales value. Coverage is high for top players and thin for low-rated or unsigned ones.
 
-Frontend: save list, import, club squad, player page, shortlist (CA match, tags contract expiring <=12 months and cheap <=GBP 5M) and scouting all use live backend queries (top 250 per query; expiry and value filter client-side). Positions use the backend's labels (AMC, not AM). Money shows in GBP. Run (in `web/`): `npm run dev`, `npm test`, `npm run typecheck`.
+Frontend: save list, import, club squad, player page, shortlist (CA match, tags contract expiring <=12 months and cheap <=GBP 5M) and scouting all use live backend queries (the backend filters in SQL, max 250 per page). Positions use the backend's labels (AMC, not AM). Money shows in GBP. Run (in `web/`): `npm run dev`, `npm test`, `npm run typecheck`.
+
+### Backend search API (`src/adapters/storage/mod.rs`, `src/services/mod.rs`)
+
+- `GET /api/snapshots/<id>/players?...` and `POST /api/snapshots/<id>/players/search` (JSON body, arrays become comma lists; same filters). Response: `total`, `page`, `limit` (max 250), `players`.
+- Filters added by us: `contractEndMax` (YYYY-MM-DD), `valueMax` (+ `valueUnknown=1` keeps players with no value), `mainPosition` (comma indices of the best-rated position), `excludeIds` (max 5000), `club=-1` (free agents), `ageMin/ageMax`, `sort=pa`, `page`.
+- `main_position` column = best-rated position. `positions[0]` (the UI's `p.p`) is NOT the main position.
+- A market value of 0 in the save means unknown: stored as NULL (PARSER_VERSION `fm24-rust-8-fm`).
+- Rust layout: `src/domain` (roles, rating_systems, hybrid), `src/adapters` (parser, storage), `src/services`, `src/error.rs`; `lib.rs` re-exports the old module names.
+
+### Scouting flow in the React app
+
+Filter, swipe, shortlist review, act. Built: filter and swipe.
+- `/scouting` = filter screen (`components/Brief.tsx`): pitch position picker (multi), age sliders, max price chips, contract chips (Any, Expired = free agents, <=12, <=6 months), live match count from `total`, "Browse as list", "Start scouting".
+- `utils/player.ts`: `scoutQuery` builds the filter params, `swipeBody` pages it (50 per page) and excludes passed ids.
+- `/scouting/swipe` (`pages/scouting/swipe.tsx`): swipe right = sign (kept in `keptState`, not persisted), left = pass (ids in local storage `fm:passed:<snapshotId>`, skipped next time; "Reset passed" clears). Tap the card to open the book with the player's real attributes. Next page loads when 5 cards are left.
+- Not built: shortlist review (mock `scout-e-shortlist.html`), add-to-squad from the kept list, role-fit panel (needs a role catalog in the web app), persisting kept players. Mocks D (swipe) and F (filter) are in `mock/`.
+- Styles: one `.css` per page or component, imported by it; `index.css` holds the shared base only.
 
 ### Squad behaviour in the React app
 

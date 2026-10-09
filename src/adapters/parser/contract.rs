@@ -3,6 +3,7 @@
 //   [start yr u16][00 00][X u32][FF FF FF FF] ... [expiry day u16][expiry yr u16]   (expiry = X + 12)
 //   [eid u32][team u32][00 x4][weekly wage u32][01 ?? 00] ...                        (wage anchor)
 use super::bytes::{u16, u32};
+use super::records::AbilityBlock;
 use super::save::date_of;
 
 #[derive(Default)]
@@ -72,8 +73,8 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
     }
 }
 
-/// Transfer value in the save's base currency: the u32 right after the 54-byte attribute block.
+/// Transfer value in the save's base currency: the u32 right after the attribute block.
 pub fn value(b: &[u8], ability_offset: usize) -> Option<u32> {
-    let p = ability_offset + 54;
+    let p = ability_offset + AbilityBlock::ATTRIBUTES;
     (p + 4 <= b.len()).then(|| u32(b, p))
 }

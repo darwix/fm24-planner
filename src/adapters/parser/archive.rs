@@ -9,6 +9,18 @@ use std::{
 
 pub use crate::utils::cancel::check;
 
+/// Archive header: `[magic x6][version] .. [index offset u64 at 9] .. [compression at 25]`.
+const HEADER: u64 = 26;
+const MAGIC: &[u8] = b"\x02\x01fmf.";
+const VERSION: usize = 6;
+const INDEX_OFFSET: std::ops::Range<usize> = 9..17;
+const COMPRESSION: usize = 25;
+/// The index starts with the archive magic and version, then a zstd frame.
+const INDEX_MAGIC: &[u8] = b"\x02\x01fmf.\x08\0\0";
+const ZSTD_MAGIC: &[u8] = b"\x28\xb5\x2f\xfd";
+/// Each member's data follows a header the size of the archive header.
+const MEMBER_HEADER: u64 = HEADER;
+
 pub fn decompress(bytes: &[u8], limit: usize, cancel: &CancelFlag) -> Result<Vec<u8>> {
     let mut decoder = zstd::stream::read::Decoder::new(bytes)
         .map_err(|_| Error::new("CORRUPT_COMPRESSION", "The save could not be decompressed."))?;
@@ -92,38 +104,45 @@ impl Archive {
             name: String::new(),
             members: vec![],
         };
-        let h = a.read(0, 26, cancel)?;
-        if &h[..6] != b"\x02\x01fmf." || h[6] != 8 {
+        let h = a.read(0, HEADER, cancel)?;
+        if &h[..MAGIC.len()] != MAGIC || h[VERSION] != 8 {
             return Err(Error::new(
                 "UNSUPPORTED_FORMAT",
                 "This file is not a supported FM24 save archive.",
             ));
         }
-        if h[25] != 0 && h[25] != 3 {
+        if h[COMPRESSION] != 0 && h[COMPRESSION] != 3 {
             return Err(Error::new(
                 "UNSUPPORTED_COMPRESSION",
                 "This save uses an unsupported compression method.",
             ));
         }
-        a.compressed = h[25] == 3;
-        let start = u64::from_le_bytes(h[9..17].try_into().unwrap())
-            .checked_add(9)
+        a.compressed = h[COMPRESSION] == 3;
+        // The stored index offset counts from the offset field itself.
+        let start = u64::from_le_bytes(h[INDEX_OFFSET].try_into().unwrap())
+            .checked_add(INDEX_OFFSET.start as u64)
             .ok_or_else(|| Error::new("INVALID_SIZE", "Invalid archive index offset."))?;
-        let header = a.read(start, 13, cancel)?;
-        if &header[..9] != b"\x02\x01fmf.\x08\0\0" || &header[9..] != b"\x28\xb5\x2f\xfd" {
+        let index_data = INDEX_MAGIC.len() as u64;
+        let header = a.read(start, index_data + ZSTD_MAGIC.len() as u64, cancel)?;
+        if &header[..INDEX_MAGIC.len()] != INDEX_MAGIC || &header[INDEX_MAGIC.len()..] != ZSTD_MAGIC
+        {
             return Err(Error::new(
                 "INVALID_MANIFEST",
                 "The save index is missing or incomplete. Try a completed backup save.",
             ));
         }
-        let tail = a.size - start - 9;
+        let tail = a.size - start - index_data;
         if tail > 32 * 1024 * 1024 {
             return Err(Error::new(
                 "INVALID_MANIFEST",
                 "The save index exceeds the supported size.",
             ));
         }
-        let bytes = decompress(&a.read(start + 9, tail, cancel)?, 64 * 1024 * 1024, cancel)?;
+        let bytes = decompress(
+            &a.read(start + index_data, tail, cancel)?,
+            64 * 1024 * 1024,
+            cancel,
+        )?;
         let mut c = Cursor {
             bytes: &bytes,
             pos: 0,
@@ -184,7 +203,7 @@ impl Archive {
             c.take(16)?;
             if offset
                 .checked_add(stored)
-                .and_then(|v| v.checked_add(26))
+                .and_then(|v| v.checked_add(MEMBER_HEADER))
                 .is_none_or(|v| v > start)
                 || plain > 2 * 1024u64.pow(3)
             {
@@ -223,7 +242,7 @@ impl Archive {
             .find(|m| m.name == name)
             .ok_or_else(|| Error::new("MISSING_MEMBER", format!("The save is missing {name}.")))?;
         let (offset, stored, plain) = (m.offset, m.stored, m.plain);
-        let bytes = self.read(offset + 26, stored, cancel)?;
+        let bytes = self.read(offset + MEMBER_HEADER, stored, cancel)?;
         let bytes = if self.compressed {
             decompress(&bytes, plain as usize, cancel)?
         } else {

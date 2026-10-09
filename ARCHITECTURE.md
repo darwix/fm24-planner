@@ -109,7 +109,9 @@ Plain lookups and writes, no decisions. `error.rs` maps rusqlite and serde_json 
 ### parser
 
 Reads the `.fm` archive: `archive` (container and compression), `records` (people, clubs,
-teams, abilities), `contract` (wage, contract end, value), `save` (`parse_save` ties them together). Byte offsets are named constants.
+teams, abilities), `contract` (wage, contract end, value), `save` (`parse_save` ties them together). Each fixed record layout is a small struct with a `read(b, at)`
+that holds its byte offsets (`PersonHead`, `AbilityBlock`, `ClubHead`, ...); other offsets are
+named constants.
 Bump `PARSER_VERSION` whenever the parser output or the snapshot schema changes, or re-import
 reuses the cached snapshot.
 

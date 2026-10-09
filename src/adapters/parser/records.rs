@@ -19,6 +19,10 @@ fn checkpoint(p: usize, c: &CancelFlag) -> Result<()> {
     Ok(())
 }
 
+/// A name pool is `[count u32]` then, per name, `[id u32][len u32][text]`.
+const POOL_COUNT: usize = 4;
+const POOL_ENTRY: usize = 8;
+
 pub struct Names {
     pub first: Vec<String>,
     pub last: Vec<String>,
@@ -27,7 +31,7 @@ pub struct Names {
     pub end: usize,
 }
 fn pool(b: &[u8], start: usize, cancel: &CancelFlag) -> Result<Option<(Vec<String>, usize)>> {
-    if start + 16 >= b.len() {
+    if start + POOL_COUNT + POOL_ENTRY + 4 >= b.len() {
         return Ok(None);
     }
     let count = u32(b, start) as usize;
@@ -35,38 +39,42 @@ fn pool(b: &[u8], start: usize, cancel: &CancelFlag) -> Result<Option<(Vec<Strin
         return Ok(None);
     }
     let mut names = Vec::new();
-    let mut p = start + 4;
+    let mut p = start + POOL_COUNT;
     for id in 0..count {
         if id % 4096 == 0 {
             check(cancel)?;
         }
-        if p + 8 > b.len() || u32(b, p) as usize != id {
+        if p + POOL_ENTRY > b.len() || u32(b, p) as usize != id {
             return Ok(None);
         }
         let n = u32(b, p + 4) as usize;
-        if n > 512 || p + 8 + n > b.len() {
+        let name = p + POOL_ENTRY;
+        if n > 512 || name + n > b.len() {
             return Ok(None);
         }
-        let Some(s) = text(&b[p + 8..p + 8 + n]) else {
+        let Some(s) = text(&b[name..name + n]) else {
             return Ok(None);
         };
         names.push(s);
-        p += 8 + n;
+        p = name + n;
     }
     Ok(Some((names, p)))
 }
 pub fn names(b: &[u8], cancel: &CancelFlag) -> Result<Names> {
     for p in 0..b.len().saturating_sub(40) {
         checkpoint(p, cancel)?;
-        if b[p + 4..p + 8] != [0; 4] {
+        // A first-name pool: a large count, then entry 0 followed by entry 1.
+        let entry = p + POOL_COUNT;
+        if b[entry..entry + 4] != [0; 4] {
             continue;
         }
         let count = u32(b, p);
         if !(10000..=3_000_000).contains(&count) {
             continue;
         }
-        let n = u32(b, p + 8) as usize;
-        if !(1..=100).contains(&n) || p + 16 + n > b.len() || u32(b, p + 12 + n) != 1 {
+        let n = u32(b, entry + 4) as usize;
+        let next = entry + POOL_ENTRY + n;
+        if !(1..=100).contains(&n) || next + 4 > b.len() || u32(b, next) != 1 {
             continue;
         }
         let Some((first, end)) = pool(b, p, cancel)? else {
@@ -122,6 +130,120 @@ pub fn display_name(first: &str, last: &str, common: Option<&str>) -> String {
         _ => format!("{first} {last}").trim().to_string(),
     }
 }
+/// Fixed header of a person record: name ids and the full-name length, each
+/// followed by a zero byte. The full name follows it, then a [`PersonTail`].
+struct PersonHead {
+    first: u32,
+    last: u32,
+    common: u32,
+    name_len: usize,
+}
+impl PersonHead {
+    const SIZE: usize = 19;
+    /// None unless the separator bytes are zero.
+    fn read(b: &[u8], at: usize) -> Option<Self> {
+        let zero = |i: usize| b[at + i] == 0;
+        (zero(4) && zero(9) && zero(14) && zero(17) && zero(18)).then(|| Self {
+            first: u32(b, at),
+            last: u32(b, at + 5),
+            common: u32(b, at + 10),
+            name_len: u32(b, at + 15) as usize,
+        })
+    }
+}
+
+/// Fields right after the full name: birth date, nation, personality, then
+/// the list of other nationalities.
+struct PersonTail {
+    birth_day: u16,
+    birth_year: u16,
+    nation: u16,
+    personality: [u8; 8],
+}
+impl PersonTail {
+    const SIZE: usize = 25;
+    /// Bytes the scan needs past the name before it trusts a match.
+    const MIN_ROOM: usize = 45;
+    /// `1` when an other-nationality list follows.
+    const NATIONS_FLAG: usize = 33;
+    const NATIONS_COUNT: usize = 34;
+    const NATIONS: usize = 35;
+    /// None unless the six bytes before the personality are zero.
+    fn read(b: &[u8], at: usize) -> Option<Self> {
+        (b[at + 11..at + 17] == [0; 6]).then(|| Self {
+            birth_day: u16(b, at),
+            birth_year: u16(b, at + 2),
+            nation: u16(b, at + 9),
+            personality: b[at + 17..at + 25].try_into().unwrap(),
+        })
+    }
+    fn plausible(&self) -> bool {
+        (1..=366).contains(&self.birth_day)
+            && (1850..=2300).contains(&self.birth_year)
+            && self.nation <= 255
+            && self.personality.iter().all(|v| (1..=20).contains(v))
+    }
+}
+
+/// One entry of the other-nationality list: nation id, four zero bytes, then markers.
+struct OtherNation {
+    nation: u32,
+}
+impl OtherNation {
+    const SIZE: usize = 16;
+    fn read(b: &[u8], at: usize) -> Option<Self> {
+        let nation = u32(b, at);
+        (nation < 256
+            && b[at + 4..at + 8] == [0; 4]
+            && b[at + 10] == 8
+            && [9, 70].contains(&b[at + 11]))
+        .then_some(Self { nation })
+    }
+}
+
+/// Entity identity found after a person record: id, uid, then the uid again or a source id.
+/// Records whose uid is not repeated carry a date and flags just before the id.
+struct IdentityRec {
+    id: u32,
+    uid: u32,
+}
+impl IdentityRec {
+    /// Bytes before the id that the checks look at.
+    const BACK: usize = 12;
+    /// Bytes from the id that the checks look at.
+    const SIZE: usize = 12;
+    fn read(b: &[u8], p: usize) -> Option<Self> {
+        if b[p - 1] != 0
+            || b[p - 2] != 0
+            || b[p - 3] != 0
+            || b[p - 7] & 7 > 2
+            || ![0, 1, 4, 5].contains(&b[p - 4])
+        {
+            return None;
+        }
+        Some(Self {
+            id: u32(b, p),
+            uid: u32(b, p + 4),
+        })
+    }
+    /// The u32 after the uid: the uid again, or a source id.
+    fn source(b: &[u8], p: usize) -> u32 {
+        u32(b, p + 8)
+    }
+    /// Date and flags that must hold when the uid is not repeated.
+    fn dated(b: &[u8], p: usize) -> bool {
+        let (day, year, flags) = (u16(b, p - 12) & 511, u16(b, p - 10), b[p - 6]);
+        (1..=366).contains(&day)
+            && (1900..=2300).contains(&year)
+            && flags & 0x85 == 0
+            && flags & 0x60 != 0
+    }
+    /// Round ids whose bytes repeat are padding, not an identity.
+    fn padding(&self, b: &[u8], p: usize) -> bool {
+        self.id & 255 == 0 && self.uid & 255 == 0 && u32(b, p + 5) == u32(b, p + 9)
+    }
+}
+
 pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person>> {
     let mut people = Vec::new();
     let mut p = names.end;
@@ -129,51 +251,36 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
         checkpoint(p, cancel)?;
         let start = p;
         p += 1;
-        if b[start + 4] != 0
-            || b[start + 9] != 0
-            || b[start + 14] != 0
-            || b[start + 17] != 0
-            || b[start + 18] != 0
+        let Some(head) = PersonHead::read(b, start) else {
+            continue;
+        };
+        if (head.first != u32::MAX && head.first as usize >= names.first.len())
+            || (head.last != u32::MAX && head.last as usize >= names.last.len())
+            || head.name_len > 200
         {
             continue;
         }
-        let (f, l, n) = (
-            u32(b, start),
-            u32(b, start + 5),
-            u32(b, start + 15) as usize,
-        );
-        if (f != u32::MAX && f as usize >= names.first.len())
-            || (l != u32::MAX && l as usize >= names.last.len())
-            || n > 200
-        {
+        let end = start + PersonHead::SIZE + head.name_len;
+        if end + PersonTail::MIN_ROOM > b.len() {
             continue;
         }
-        let end = start + 19 + n;
-        if end + 45 > b.len() {
+        let Some(tail) = PersonTail::read(b, end).filter(PersonTail::plausible) else {
             continue;
-        }
-        let (day, year, nation) = (u16(b, end), u16(b, end + 2), u16(b, end + 9));
-        if !(1..=366).contains(&day) || !(1850..=2300).contains(&year) || nation > 255 {
-            continue;
-        }
-        if b[end + 11..end + 17] != [0; 6]
-            || !b[end + 17..end + 25].iter().all(|v| (1..=20).contains(v))
-        {
-            continue;
-        }
-        let Some(full_name) = text(&b[start + 19..end]) else {
+        };
+        let Some(full_name) = text(&b[start + PersonHead::SIZE..end]) else {
             continue;
         };
         let first = names
             .first
-            .get(f as usize)
+            .get(head.first as usize)
             .map(String::as_str)
             .unwrap_or("");
-        let last = names.last.get(l as usize).map(String::as_str).unwrap_or("");
-        let common = names
-            .common
-            .get(u32(b, start + 10) as usize)
-            .map(String::as_str);
+        let last = names
+            .last
+            .get(head.last as usize)
+            .map(String::as_str)
+            .unwrap_or("");
+        let common = names.common.get(head.common as usize).map(String::as_str);
         let name = display_name(first, last, common);
         let name = if name.is_empty() {
             full_name.clone()
@@ -194,53 +301,45 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
             } else {
                 full_name
             },
-            birth_day: day,
-            birth_year: year,
-            nation,
-            personality: b[end + 17..end + 25].to_vec(),
+            birth_day: tail.birth_day,
+            birth_year: tail.birth_year,
+            nation: tail.nation,
+            personality: tail.personality.to_vec(),
             other_nations: vec![],
             identity_offset: 0,
         });
-        p = end + 25;
+        p = end + PersonTail::SIZE;
     }
     if names.end + 4 > b.len() {
         return Err(Error::new("TRUNCATED", "The person table is incomplete."));
     }
     let max_id = u32(b, names.end) as u64 + 1;
     let mut identities = Vec::new();
-    for p in names.end + 7..b.len().saturating_sub(12) {
+    for p in names.end + 7..b.len().saturating_sub(IdentityRec::SIZE) {
         checkpoint(p, cancel)?;
-        if b[p - 1] != 0
-            || b[p - 2] != 0
-            || b[p - 3] != 0
-            || b[p - 7] & 7 > 2
-            || ![0, 1, 4, 5].contains(&b[p - 4])
+        let Some(rec) = IdentityRec::read(b, p) else {
+            continue;
+        };
+        if rec.id as u64 >= max_id || rec.uid == 0 || rec.uid == u32::MAX {
+            continue;
+        }
+        let source = IdentityRec::source(b, p);
+        if rec.uid != source
+            && (p < IdentityRec::BACK
+                || !IdentityRec::dated(b, p)
+                || source < 1000
+                || source == u32::MAX)
         {
             continue;
         }
-        let (id, uid) = (u32(b, p), u32(b, p + 4));
-        if id as u64 >= max_id || uid == 0 || uid == u32::MAX {
+        if rec.padding(b, p) {
             continue;
         }
-        if uid != u32(b, p + 8) {
-            if p < 12 {
-                continue;
-            }
-            let (day, year, source) = (u16(b, p - 12) & 511, u16(b, p - 10), u32(b, p + 8));
-            if !(1..=366).contains(&day)
-                || !(1900..=2300).contains(&year)
-                || b[p - 6] & 0x85 != 0
-                || b[p - 6] & 0x60 == 0
-                || source < 1000
-                || source == u32::MAX
-            {
-                continue;
-            }
-        }
-        if id & 255 == 0 && uid & 255 == 0 && u32(b, p + 5) == u32(b, p + 9) {
-            continue;
-        }
-        identities.push(Identity { offset: p, id, uid });
+        identities.push(Identity {
+            offset: p,
+            id: rec.id,
+            uid: rec.uid,
+        });
     }
     // Reproduce the strictly ascending entity chain, including tie replacement.
     let mut tails: Vec<u32> = vec![];
@@ -274,7 +373,7 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
         }
         let end = people.get(i + 1).map_or(b.len(), |p| p.offset);
         let person = &mut people[i];
-        while j < ordered.len() && ordered[j].offset < person.end + 25 {
+        while j < ordered.len() && ordered[j].offset < person.end + PersonTail::SIZE {
             j += 1;
         }
         let Some(identity) = ordered.get(j).filter(|x| x.offset < end) else {
@@ -283,19 +382,19 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
         person.id = identity.id as i64;
         person.uid = identity.uid;
         person.identity_offset = identity.offset;
-        let count = b[person.end + 34] as usize;
-        if b[person.end + 33] == 1 && person.end + 35 + count * 16 <= identity.offset {
+        let count = b[person.end + PersonTail::NATIONS_COUNT] as usize;
+        let list = person.end + PersonTail::NATIONS;
+        if b[person.end + PersonTail::NATIONS_FLAG] == 1
+            && list + count * OtherNation::SIZE <= identity.offset
+        {
             for k in 0..count {
-                let p = person.end + 35 + k * 16;
-                let n = u32(b, p);
-                if n < 256
-                    && n != person.nation as u32
-                    && b[p + 4..p + 8] == [0; 4]
-                    && b[p + 10] == 8
-                    && [9, 70].contains(&b[p + 11])
-                    && !person.other_nations.contains(&n)
+                let Some(other) = OtherNation::read(b, list + k * OtherNation::SIZE) else {
+                    continue;
+                };
+                if other.nation != person.nation as u32
+                    && !person.other_nations.contains(&other.nation)
                 {
-                    person.other_nations.push(n);
+                    person.other_nations.push(other.nation);
                 }
             }
         }
@@ -312,87 +411,137 @@ pub struct Ability {
     pub positions: Vec<u8>,
     pub raw: Vec<u8>,
 }
+/// Ability block, read from `at`, the start of its attribute ratings:
+/// `[owner u32][uid u32][source u32] .. [ca][00][pa][00] .. [team u32] .. [15 position ratings][54 attributes]`.
+pub(super) struct AbilityBlock<'a> {
+    owner: u32,
+    uid: u32,
+    source: u32,
+    ca: u8,
+    pa: u8,
+    team: u32,
+    positions: &'a [u8],
+    attributes: &'a [u8],
+}
+impl<'a> AbilityBlock<'a> {
+    /// Bytes from the owner id to the attributes.
+    const BEFORE: usize = 57;
+    pub(super) const ATTRIBUTES: usize = 54;
+    /// None unless the bytes after CA and PA are zero.
+    fn read(b: &'a [u8], at: usize) -> Option<Self> {
+        (b[at - 37] == 0 && b[at - 35] == 0).then(|| Self {
+            owner: u32(b, at - 57),
+            uid: u32(b, at - 53),
+            source: u32(b, at - 49),
+            ca: b[at - 38],
+            pa: b[at - 36],
+            team: u32(b, at - 23),
+            positions: &b[at - 15..at],
+            attributes: &b[at..at + Self::ATTRIBUTES],
+        })
+    }
+    fn plausible(&self) -> bool {
+        (1..=200).contains(&self.ca)
+            && (1..=200).contains(&self.pa)
+            && self.positions.iter().all(|v| (1..=20).contains(v))
+            && self.positions.contains(&20)
+            && self.attributes.iter().all(|v| (1..=100).contains(v))
+            && ![0, u32::MAX].contains(&self.uid)
+            && ![0, u32::MAX].contains(&self.source)
+    }
+}
+
 pub fn abilities(b: &[u8], start: usize, cancel: &CancelFlag) -> Result<Vec<Ability>> {
     let mut blocks = vec![];
-    let mut p = start + 57;
-    while p < b.len().saturating_sub(54) {
+    let mut p = start + AbilityBlock::BEFORE;
+    while p < b.len().saturating_sub(AbilityBlock::ATTRIBUTES) {
         checkpoint(p, cancel)?;
         let at = p;
         p += 1;
-        if b[at - 37] != 0 || b[at - 35] != 0 {
+        let Some(block) = AbilityBlock::read(b, at).filter(AbilityBlock::plausible) else {
             continue;
-        }
-        let (ca, pa) = (b[at - 38], b[at - 36]);
-        if !(1..=200).contains(&ca) || !(1..=200).contains(&pa) {
-            continue;
-        }
-        let positions = &b[at - 15..at];
-        if !positions.iter().all(|v| (1..=20).contains(v))
-            || !positions.contains(&20)
-            || !b[at..at + 54].iter().all(|v| (1..=100).contains(v))
-        {
-            continue;
-        }
-        let (uid, source) = (u32(b, at - 53), u32(b, at - 49));
-        if uid == 0 || uid == u32::MAX || source == 0 || source == u32::MAX {
-            continue;
-        }
+        };
         blocks.push(Ability {
             offset: at,
-            owner_id: u32(b, at - 57) as u64 + 1,
-            ca,
-            pa,
-            team: u32(b, at - 23),
-            positions: positions.to_vec(),
-            raw: b[at..at + 54].to_vec(),
+            owner_id: block.owner as u64 + 1,
+            ca: block.ca,
+            pa: block.pa,
+            team: block.team,
+            positions: block.positions.to_vec(),
+            raw: block.attributes.to_vec(),
         });
-        p = at + 54;
+        p = at + AbilityBlock::ATTRIBUTES;
     }
     Ok(blocks)
 }
 
 pub use crate::domain::entities::Club;
+
+/// Fixed head of a club record: `[id u32][uid u32][uid u32][00][nation u32][FF x4] ..
+/// [nation u32] .. [name len u32]`, then the name, `[short name len u32]` and the short name.
+struct ClubHead {
+    id: u32,
+    uid: u32,
+    nation: u32,
+    name_len: usize,
+}
+impl ClubHead {
+    const SIZE: usize = 43;
+    /// Bytes the scan needs before it trusts a match.
+    const MIN_ROOM: usize = 50;
+    /// None unless the separators match and the uid and nation repeat.
+    fn read(b: &[u8], at: usize) -> Option<Self> {
+        if b[at + 12] != 0 || b[at + 17..at + 21] != [255; 4] {
+            return None;
+        }
+        let (uid, nation) = (u32(b, at + 4), u32(b, at + 13));
+        (u32(b, at + 25) == nation && u32(b, at + 8) == uid).then(|| Self {
+            id: u32(b, at),
+            uid,
+            nation,
+            name_len: u32(b, at + 39) as usize,
+        })
+    }
+}
+
 pub fn clubs(b: &[u8], end: usize, cancel: &CancelFlag) -> Result<Vec<Club>> {
     let mut clubs = vec![];
     let mut p = 0;
-    while p + 50 < end {
+    while p + ClubHead::MIN_ROOM < end {
         checkpoint(p, cancel)?;
         let at = p;
         p += 1;
-        if b[at + 12] != 0 || b[at + 17..at + 21] != [255; 4] {
-            continue;
-        }
-        let nation = u32(b, at + 13);
-        if nation > 255 || u32(b, at + 25) != nation {
-            continue;
-        }
-        let (uid, id) = (u32(b, at + 4), u32(b, at));
-        if uid == 0 || uid == u32::MAX || uid != u32(b, at + 8) || id > 100000 {
-            continue;
-        }
-        let n = u32(b, at + 39) as usize;
-        if !(2..=200).contains(&n) || at + 47 + n >= end {
-            continue;
-        }
-        let sn = u32(b, at + 43 + n) as usize;
-        if !(1..=100).contains(&sn) || at + 47 + n + sn > end {
-            continue;
-        }
-        let Some(name) = text(&b[at + 43..at + 43 + n]) else {
+        let Some(head) = ClubHead::read(b, at) else {
             continue;
         };
-        let Some(short_name) = text(&b[at + 47 + n..at + 47 + n + sn]) else {
+        if head.nation > 255 || [0, u32::MAX].contains(&head.uid) || head.id > 100000 {
+            continue;
+        }
+        let n = head.name_len;
+        let name_at = at + ClubHead::SIZE;
+        let short_at = name_at + n + 4;
+        if !(2..=200).contains(&n) || short_at >= end {
+            continue;
+        }
+        let sn = u32(b, name_at + n) as usize;
+        if !(1..=100).contains(&sn) || short_at + sn > end {
+            continue;
+        }
+        let Some(name) = text(&b[name_at..name_at + n]) else {
+            continue;
+        };
+        let Some(short_name) = text(&b[short_at..short_at + sn]) else {
             continue;
         };
         clubs.push(Club {
-            id,
-            uid,
-            nation,
+            id: head.id,
+            uid: head.uid,
+            nation: head.nation,
             name,
             short_name,
             offset: at,
         });
-        p = at + 47 + n + sn;
+        p = short_at + sn;
     }
     Ok(clubs)
 }
@@ -414,6 +563,22 @@ struct Head {
     /// Reserve/youth records carry their own name in place of the ten zero bytes.
     name: Option<String>,
 }
+/// Team head: `[owner u32][00 x10][ordinal u32][uid u32][uid u32][10]`, optionally preceded by
+/// `[01][kind][FF][flag]`. The roster follows somewhere after it.
+impl Head {
+    const ZEROS: std::ops::Range<usize> = 4..14;
+    const ORDINAL: usize = 14;
+    const UID: usize = 18;
+    const UID_AGAIN: usize = 22;
+    /// Holds 10.
+    const MARKER: usize = 26;
+    /// Where the next head can start.
+    const SIZE: usize = 26;
+    /// Where the roster search starts.
+    const ROSTER_FROM: usize = 30;
+}
+/// Roster: `[FF x4][count u16][count ids u32][captain u32][vice u32]`.
+const ROSTER_IDS: usize = 6;
 /// Reserve/youth record: owner, name twice (length-prefixed, NUL-terminated), then ordinal, uid, uid, 10.
 fn named_head(b: &[u8], p: usize) -> Option<Head> {
     let l = u32(b, p) as usize;
@@ -430,13 +595,17 @@ fn named_head(b: &[u8], p: usize) -> Option<Head> {
     {
         return None;
     }
-    let r = q + 5 + l;
-    let (ordinal, uid) = (u32(b, r), u32(b, r + 4));
-    if uid == 0 || uid != u32(b, r + 8) || b[r + 12] != 10 || ordinal > 500000 {
+    let offset = q + 5 + l - Head::ORDINAL;
+    let (ordinal, uid) = (u32(b, offset + Head::ORDINAL), u32(b, offset + Head::UID));
+    if uid == 0
+        || uid != u32(b, offset + Head::UID_AGAIN)
+        || b[offset + Head::MARKER] != 10
+        || ordinal > 500000
+    {
         return None;
     }
     Some(Head {
-        offset: r - 14,
+        offset,
         owner: u32(b, p - 4),
         ordinal,
         uid,
@@ -479,20 +648,26 @@ pub fn teams(
         let at = p;
         p += 1;
         if let Some(h) = named_head(b, at) {
-            p = h.offset + 26;
+            p = h.offset + Head::SIZE;
             heads.push(h);
             continue;
         }
-        if b[at + 26] != 10 || b[at + 4..at + 14] != [0; 10] {
+        if b[at + Head::MARKER] != 10 || b[at + Head::ZEROS.start..at + Head::ZEROS.end] != [0; 10]
+        {
             continue;
         }
-        let (owner, ordinal, uid) = (u32(b, at), u32(b, at + 14), u32(b, at + 18));
+        let (owner, ordinal, uid) = (
+            u32(b, at),
+            u32(b, at + Head::ORDINAL),
+            u32(b, at + Head::UID),
+        );
         if owner > 100000 || ordinal > 500000 || uid == 0 {
             continue;
         }
         let typed =
             b[at - 4] == 1 && b[at - 2] == 255 && [18, 19, 20, 21, 23, 100].contains(&b[at - 3]);
-        let matched = club_map.get(&owner).is_some_and(|c| c.uid == uid) && u32(b, at + 22) == uid;
+        let matched = club_map.get(&owner).is_some_and(|c| c.uid == uid)
+            && u32(b, at + Head::UID_AGAIN) == uid;
         if !typed && !matched {
             continue;
         }
@@ -506,7 +681,7 @@ pub fn teams(
             flag: if typed { b[at - 1] } else { 0 },
             name: None,
         });
-        p = at + 26;
+        p = at + Head::SIZE;
     }
     let mut teams = vec![];
     for (i, h) in heads.iter().enumerate() {
@@ -543,20 +718,21 @@ pub fn teams(
             }
         }
         let mut members = vec![];
-        for p in h.offset + 30..limit.saturating_sub(14) {
+        for p in h.offset + Head::ROSTER_FROM..limit.saturating_sub(14) {
             if b[p] != 255 || u32(b, p) != u32::MAX {
                 continue;
             }
             let count = u16(b, p + 4) as usize;
-            if !(1..=150).contains(&count) || p + 6 + count * 4 + 8 > limit {
+            let after = p + ROSTER_IDS + count * 4;
+            if !(1..=150).contains(&count) || after + 8 > limit {
                 continue;
             }
-            let ids: Vec<_> = (0..count).map(|k| u32(b, p + 6 + k * 4)).collect();
+            let ids: Vec<_> = (0..count).map(|k| u32(b, p + ROSTER_IDS + k * 4)).collect();
             let set: HashSet<_> = ids.iter().copied().collect();
             if set.len() != count || ids.iter().any(|&id| id > 3_000_000) {
                 continue;
             }
-            let (captain, vice) = (u32(b, p + 6 + count * 4), u32(b, p + 10 + count * 4));
+            let (captain, vice) = (u32(b, after), u32(b, after + 4));
             if (captain != u32::MAX && !set.contains(&captain))
                 || (vice != u32::MAX && !set.contains(&vice))
             {

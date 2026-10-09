@@ -3,7 +3,7 @@ use fm_savelens_backend::utils::cancel::CancelFlag;
 use fm_savelens_backend::{
     adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
     adapters::persistence::{snapshot, SqliteSnapshotRepository},
-    application::use_cases::ports::SnapshotRepository,
+    application::use_cases::saves::SnapshotRepository,
     domain::{
         catalog::CATALOG,
         entities::{NewSnapshot, SnapshotId, SnapshotMeta},

@@ -28,7 +28,6 @@ src/
 ├── application/            what the app does
 │   ├── session.rs          in-memory state: settings, import jobs, shutdown flag
 │   └── use_cases/
-│       ├── ports.rs        traits the adapters implement
 │       ├── saves.rs        SaveUseCase: list saves, snapshot metadata
 │       ├── imports.rs      SaveUseCase: start, run, cancel an import
 │       ├── players.rs      PlayerUseCase: search and read players
@@ -72,15 +71,15 @@ Use cases hold the logic and talk to the outside only through ports.
 | `PlayerUseCase`  | searches players, reads one player                            |
 | `SettingsUseCase`| reads and changes the save folder                             |
 
-Ports (`use_cases/ports.rs`):
+Ports are traits declared next to the code that uses them, like `std::io::Read` lives in `io`:
 
-| Port                 | Implemented by                  |
-| -------------------- | ------------------------------- |
-| `SaveReader`         | `parser::reader::FmSaveReader`  |
-| `SaveFiles`          | `persistence::FsSaveFiles`      |
-| `SettingsRepository` | `persistence::JsonSettingsRepository` |
-| `SnapshotRepository` | `persistence::SqliteSnapshotRepository` |
-| `PlayerRepository`   | `persistence::SqlitePlayerRepository` |
+| Port                 | Declared in              | Implemented by                          |
+| -------------------- | ------------------------ | --------------------------------------- |
+| `SaveReader`         | `use_cases/saves.rs`     | `parser::reader::FmSaveReader`          |
+| `SaveFiles`          | `use_cases/saves.rs`     | `persistence::FsSaveFiles`              |
+| `SnapshotRepository` | `use_cases/saves.rs`     | `persistence::SqliteSnapshotRepository` |
+| `PlayerRepository`   | `use_cases/players.rs`   | `persistence::SqlitePlayerRepository`   |
+| `SettingsRepository` | `session.rs`             | `persistence::JsonSettingsRepository`   |
 
 `Session` is the only runtime state: the current settings, the import jobs and the shutdown
 flag. The save and settings use cases share it behind an `Arc`.

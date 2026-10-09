@@ -158,8 +158,8 @@ pub fn save_use_case(
             persistence::{FsSaveFiles, SqliteSnapshotRepository},
         },
         application::{
-            session::Session,
-            use_cases::{ports::SettingsRepository, SaveUseCase},
+            session::{Session, SettingsRepository},
+            use_cases::SaveUseCase,
         },
         domain::entities::Settings,
     };

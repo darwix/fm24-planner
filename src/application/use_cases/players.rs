@@ -1,9 +1,14 @@
 use crate::{
-    application::use_cases::ports::PlayerRepository,
     domain::entities::{PlayerDetail, PlayerFilter, PlayerPage, SnapshotId},
     Error, Result,
 };
 use std::sync::Arc;
+
+/// Reads players from an imported snapshot.
+pub trait PlayerRepository: Send + Sync {
+    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Option<PlayerDetail>>;
+    fn search(&self, snapshot: &SnapshotId, filter: &PlayerFilter) -> Result<PlayerPage>;
+}
 
 pub struct PlayerUseCase {
     players: Arc<dyn PlayerRepository>,

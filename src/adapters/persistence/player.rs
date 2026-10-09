@@ -1,6 +1,6 @@
 use super::snapshot::{open_snapshot, snapshot_file};
 use crate::{
-    application::use_cases::ports::PlayerRepository,
+    application::use_cases::players::PlayerRepository,
     domain::entities::{
         ClubFilter, PlayerDetail, PlayerFilter, PlayerPage, PlayerSummary, SnapshotId, SortKey,
     },

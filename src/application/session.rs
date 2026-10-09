@@ -1,6 +1,5 @@
 use crate::utils::cancel::CancelFlag;
 use crate::{
-    application::use_cases::ports::SettingsRepository,
     domain::entities::{Job, Settings},
     Result,
 };
@@ -8,6 +7,12 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, Condvar, Mutex},
 };
+
+/// Keeps the user settings between runs.
+pub trait SettingsRepository: Send + Sync {
+    fn load(&self) -> Result<Settings>;
+    fn save(&self, settings: &Settings) -> Result<()>;
+}
 
 pub type Completion = Arc<(Mutex<bool>, Condvar)>;
 

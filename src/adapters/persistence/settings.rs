@@ -1,6 +1,4 @@
-use crate::{
-    application::use_cases::ports::SettingsRepository, domain::entities::Settings, Error, Result,
-};
+use crate::{application::session::SettingsRepository, domain::entities::Settings, Error, Result};
 use serde_json::Value;
 use std::{fs, io::Write, path::PathBuf};
 

@@ -1,6 +1,6 @@
 use super::{parse_save, PARSER_VERSION};
 use crate::utils::cancel::CancelFlag;
-use crate::{application::use_cases::ports::SaveReader, domain::entities::ParsedSave, Result};
+use crate::{application::use_cases::saves::SaveReader, domain::entities::ParsedSave, Result};
 use std::path::Path;
 
 /// Reads FM24 `.fm` saves.

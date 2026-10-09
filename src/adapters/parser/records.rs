@@ -465,6 +465,24 @@ fn named_head(b: &[u8], p: usize) -> Option<Head> {
         name: Some(String::from_utf8_lossy(text).into_owned()),
     })
 }
+/// For teams whose own record names no club: the club most of their players' contracts name.
+/// `rows` are (team id, contract team field). A tie, or a field that is not a club, gives nothing.
+pub fn club_by_contract(rows: &[(u32, u32)], clubs: &HashSet<u32>) -> HashMap<u32, u32> {
+    let mut votes: HashMap<u32, HashMap<u32, u32>> = HashMap::new();
+    for &(team, club) in rows.iter().filter(|r| clubs.contains(&r.1)) {
+        *votes.entry(team).or_default().entry(club).or_default() += 1;
+    }
+    votes
+        .into_iter()
+        .filter_map(|(team, v)| {
+            let top = v.values().max().copied()?;
+            let mut best = v.iter().filter(|x| *x.1 == top);
+            let (club, _) = best.next()?;
+            best.next().is_none().then_some((team, *club))
+        })
+        .collect()
+}
+
 pub fn teams(
     b: &[u8],
     clubs: &[Club],

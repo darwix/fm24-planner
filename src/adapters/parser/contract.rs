@@ -7,6 +7,7 @@ use super::date_of;
 #[derive(Default)]
 pub struct Contract {
     pub wage: Option<u32>,
+    pub team: Option<u32>,
     pub contract_end: Option<String>,
 }
 
@@ -49,6 +50,7 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
     });
     Contract {
         wage: Some(u32(window, i + 12)),
+        team: Some(u32(window, i + 4)),
         contract_end,
     }
 }

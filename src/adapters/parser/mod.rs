@@ -14,7 +14,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-pub const PARSER_VERSION: &str = "fm24-rust-13-fm";
+pub const PARSER_VERSION: &str = "fm24-rust-14-fm";
 #[derive(Deserialize, Serialize)]
 pub struct Attribute {
     pub key: String,
@@ -164,6 +164,8 @@ pub fn parse_save(
         }
     }
     let mut players = vec![];
+    let mut player_team = vec![]; // ability team of each player, for the contract fallback below
+    let mut clubless = vec![]; // (ability team, contract team field) of players no team record placed
     for (p, ability) in linked {
         check(cancel)?;
         let club_id = team_map
@@ -187,6 +189,10 @@ pub fn parse_save(
             })
             .collect();
         let contract = contract::find(&b[p.offset.saturating_sub(800)..p.offset], p.id as u32);
+        player_team.push(ability.team);
+        if let (None, Some(t)) = (club_id, contract.team) {
+            clubless.push((ability.team, t));
+        }
         let birth_date = date_of(p.birth_year, p.birth_day)?;
         let age = year as i32 - p.birth_year as i32 - i32::from(game_date[5..] < birth_date[5..]);
         players.push(Player { id: p.id as u32, uid: p.uid, name: p.name.clone(), full_name: p.full_name.clone(), age,
@@ -196,6 +202,14 @@ pub fn parse_save(
             position_ratings: ability.positions.clone(), attributes, raw_attributes: raw,
             wage: contract.wage, contract_end: contract.contract_end, value: contract::value(&b, ability.offset),
             source: json!({"person":p.offset,"ability":ability.offset,"identity":p.identity_offset}) });
+    }
+    // Reserve/youth teams whose record names no club: take the club their players are contracted to.
+    let team_club = records::club_by_contract(&clubless, &club_map.keys().copied().collect());
+    for (p, team) in players.iter_mut().zip(&player_team) {
+        if let (None, Some(&id)) = (p.club_id, team_club.get(team)) {
+            p.club_id = Some(id);
+            p.club = club_map.get(&id).map(|c| c.short_name.clone());
+        }
     }
     // Only clubs with players: league names in the summary can collide with club-less records.
     let with_players: HashSet<_> = players.iter().filter_map(|p| p.club_id).collect();

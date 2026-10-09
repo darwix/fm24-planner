@@ -1,3 +1,4 @@
+import "./player.css";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { clubState, squadState } from "@/atoms/squadState";

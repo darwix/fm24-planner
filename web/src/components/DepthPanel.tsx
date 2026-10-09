@@ -1,3 +1,4 @@
+import "@/pages/squad/squad.css";
 import type { MouseEvent } from "react";
 import type { SquadPlayer } from "@/models/player";
 import { TARGET, inGroup, need } from "@/utils/logic";

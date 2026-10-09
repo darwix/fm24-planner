@@ -1,3 +1,4 @@
+import "./scouting.css";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";

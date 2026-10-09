@@ -1,0 +1,330 @@
+.swipe {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px 40px;
+  overflow-x: hidden;
+}
+.sw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.sw-head .sub {
+  margin: 0;
+}
+.swipe .stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 28px;
+  flex-wrap: wrap;
+  perspective: 2200px;
+}
+.swipe .main {
+  display: grid;
+  justify-items: center;
+  width: 420px;
+  max-width: 100%;
+}
+.swipe .deck {
+  position: relative;
+  width: min(420px, 100%);
+  height: 640px;
+  touch-action: none;
+}
+.swipe .card {
+  position: absolute;
+  inset: 0;
+  background: var(--card);
+  border-radius: 20px;
+  padding: 22px 24px;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 14px 34px #3a301420;
+  cursor: grab;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  transition:
+    transform 0.25s,
+    opacity 0.25s;
+}
+.swipe .card.drag {
+  transition: none;
+  cursor: grabbing;
+}
+.swipe .card h2 {
+  font-size: 28px;
+  letter-spacing: -0.02em;
+}
+.swipe .meta {
+  color: var(--mut);
+  margin: 4px 0 14px;
+}
+.swipe .tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+.swipe .tags span {
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.swipe .marks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+  padding: 14px 0;
+}
+.swipe .m {
+  display: grid;
+  gap: 5px;
+}
+.swipe .m b {
+  font:
+    700 17px Fraunces,
+    serif;
+}
+.swipe .bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.swipe .bar i {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+}
+.swipe .sec {
+  margin-top: 14px;
+}
+.swipe .sec > .lbl {
+  display: block;
+  margin-bottom: 8px;
+}
+.swipe .fin {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  background: var(--bg);
+  border-radius: 12px;
+  padding: 12px;
+}
+.swipe .fin div {
+  display: grid;
+  gap: 3px;
+}
+.swipe .fin b {
+  font:
+    700 15px Fraunces,
+    serif;
+}
+.stamp {
+  position: absolute;
+  top: 26px;
+  border: 3px solid;
+  font: 700 20px Geist;
+  letter-spacing: 0.12em;
+  padding: 4px 12px;
+  border-radius: 8px;
+  opacity: 0;
+  pointer-events: none;
+}
+.stamp.pass {
+  right: 22px;
+  color: var(--bad);
+  transform: rotate(10deg);
+}
+.stamp.sign {
+  left: 22px;
+  color: var(--acc);
+  transform: rotate(-10deg);
+}
+.exp {
+  display: inline-block;
+  color: var(--warn);
+  font: 700 11px Geist;
+  letter-spacing: 0.1em;
+  border: 2px solid var(--warn);
+  border-radius: 6px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.swipe .done {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 10px;
+  height: 100%;
+  color: var(--mut);
+}
+.swipe .panel {
+  display: none;
+  width: min(400px, 100%);
+  background: var(--card);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 14px 34px #3a301420;
+}
+.swipe .open {
+  gap: 0;
+  flex-wrap: nowrap;
+}
+.swipe .open .panel {
+  display: block;
+  height: 640px;
+  overflow: auto;
+  border-radius: 0 20px 20px 0;
+  padding: 24px 28px 24px 36px;
+  transform-origin: left center;
+  animation: turn 0.6s cubic-bezier(0.3, 0.7, 0.2, 1);
+  background: linear-gradient(90deg, #3a301428, transparent 34px), var(--card);
+  position: relative;
+}
+.swipe .open .panel.flip {
+  animation: flip 0.38s ease-in forwards;
+}
+.swipe .open.closing .panel {
+  animation: turn 0.35s reverse ease-in forwards;
+}
+@keyframes flip {
+  to {
+    transform: rotateY(-100deg);
+    opacity: 0.2;
+  }
+}
+@keyframes turn {
+  from {
+    transform: rotateY(-100deg);
+    opacity: 0.2;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.swipe .open .card:not(:last-child) {
+  display: none;
+}
+.swipe .open .card {
+  border-radius: 20px 0 0 20px;
+  cursor: pointer;
+  background: linear-gradient(270deg, #3a301422, transparent 30px), var(--card);
+}
+.swipe .open .deck {
+  margin-right: -1px;
+}
+.ribbon {
+  position: absolute;
+  top: 0;
+  right: 28px;
+  width: 18px;
+  height: 54px;
+  background: var(--bad);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 82%, 0 100%);
+}
+.swipe .panel h3 {
+  font-size: 22px;
+}
+.swipe .panel .close {
+  float: right;
+  margin-right: 44px;
+  background: none;
+  border: 0;
+  font: 500 13px Geist;
+  color: var(--mut);
+  cursor: pointer;
+}
+.ag1 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 18px;
+  font-size: 13px;
+}
+.ag1 div {
+  display: flex;
+  justify-content: space-between;
+}
+.controls {
+  display: grid;
+  justify-items: center;
+  padding: 0 16px;
+}
+.controls .acts {
+  display: flex;
+  gap: 16px;
+  margin-top: 22px;
+  align-items: center;
+}
+.round {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--card);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    0 6px 14px #3a301418;
+  font: 600 13px Geist;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.round:active {
+  transform: scale(0.94);
+}
+.round:disabled {
+  opacity: 0.4;
+}
+.round.no {
+  color: var(--bad);
+}
+.round.yes {
+  color: var(--acc);
+}
+.round.sm {
+  font-size: 12px;
+  width: 44px;
+  height: 44px;
+  color: var(--mut);
+}
+.controls .count {
+  color: var(--mut);
+  margin-top: 14px;
+}
+.picked {
+  margin-top: 20px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 380px;
+}
+.picked span {
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.swipe .lbl {
+  display: block;
+  font: 600 10px Geist;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mut);
+}

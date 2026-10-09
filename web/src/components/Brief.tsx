@@ -1,3 +1,4 @@
+import "./Brief.css";
 import type { ReactNode } from "react";
 import type { ScoutFilter } from "@/models/player";
 

@@ -1,3 +1,4 @@
+import "@/pages/squad/squad.css";
 import type { SquadPlayer } from "@/models/player";
 
 interface Props {

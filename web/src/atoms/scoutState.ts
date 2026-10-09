@@ -1,5 +1,5 @@
 import { atom } from "recoil";
-import type { ScoutList } from "@/models/player";
+import type { PoolPlayer, ScoutList } from "@/models/player";
 
 export const listsState = atom<ScoutList[]>({
   key: "listsState",
@@ -19,4 +19,10 @@ export const listsState = atom<ScoutList[]>({
 export const listIndexState = atom<number>({
   key: "listIndexState",
   default: 0,
+});
+
+// players swiped right on, waiting for review
+export const keptState = atom<PoolPlayer[]>({
+  key: "keptState",
+  default: [],
 });

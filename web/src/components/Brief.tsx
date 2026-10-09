@@ -62,12 +62,14 @@ export default function Brief({
   total,
   list,
   onList,
+  onStart,
 }: {
   f: ScoutFilter;
   patch: (next: Partial<ScoutFilter>) => void;
   total?: number;
   list: boolean;
   onList: () => void;
+  onStart: () => void;
 }) {
   const setMin = (v: number) => patch({ min: Math.min(v, f.max) });
   const setMax = (v: number) => patch({ max: Math.max(v, f.min) });
@@ -170,8 +172,16 @@ export default function Brief({
             : "players match."}
         </span>
         <div className="grow">
-          <button className="btn pri" onClick={onList}>
+          <button className="btn" onClick={onList}>
             {list ? "Hide list" : "Browse as list"}
+          </button>
+          <button
+            className="btn pri"
+            disabled={!total}
+            onClick={onStart}
+            style={{ marginLeft: 8 }}
+          >
+            Start scouting →
           </button>
         </div>
       </div>

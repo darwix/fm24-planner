@@ -5,7 +5,7 @@ import { listIndexState, listsState } from "@/atoms/scoutState";
 import { clubState, squadState } from "@/atoms/squadState";
 import type { PoolPlayer, ScoutFilter } from "@/models/player";
 import { useSearchResult } from "@/services/save";
-import Brief from "./brief";
+import Brief from "@/components/Brief";
 import { money, wage } from "@/utils/format";
 import { scoutQuery, toPool } from "@/utils/player";
 
@@ -122,6 +122,7 @@ export default function Scouting() {
           total={result?.total}
           list={list}
           onList={() => setList(!list)}
+          onStart={() => nav("/scouting/swipe")}
         />
         {list && (
           <table className="tb">

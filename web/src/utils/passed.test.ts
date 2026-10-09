@@ -1,9 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { addPassed, clearPassed, loadPassed } from "./passed";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { addPassed, clearPassed, loadPassed, removePassed } from "./passed";
 import { scoutQuery, swipeBody } from "./player";
 
+let mem: Record<string, string>;
 beforeEach(() => {
-  localStorage.clear();
+  mem = {};
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => mem[k] ?? null,
+    setItem: (k: string, v: string) => {
+      mem[k] = v;
+    },
+  });
 });
 
 describe("passed players", () => {
@@ -45,5 +52,14 @@ describe("swipeBody", () => {
   });
   it("leaves excludeIds out when nothing was passed", () => {
     expect(swipeBody(q, [], 1).excludeIds).toBeUndefined();
+  });
+});
+
+describe("removePassed", () => {
+  it("takes one id back out", () => {
+    addPassed("a", 5);
+    addPassed("a", 7);
+    removePassed("a", 5);
+    expect(loadPassed("a")).toEqual([7]);
   });
 });

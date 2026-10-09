@@ -92,3 +92,9 @@ export async function loadSquad(
   );
   return applyArrangement(arr, fresh);
 }
+
+export const searchPage = async (
+  snap: string,
+  body: Record<string, unknown>,
+): Promise<{ players: ApiPlayer[]; total: number }> =>
+  (await api.post(`/api/snapshots/${snap}/players/search`, body)).data;

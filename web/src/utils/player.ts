@@ -62,3 +62,17 @@ export const toPool = (p: ApiPlayer, gameDate: string): PoolPlayer => ({
   v: p.value ? Math.round(p.value / 1e5) / 10 : undefined,
   w: p.wage ? Math.round(p.wage / 1000) : undefined,
 });
+
+export const SWIPE_PAGE = 50;
+
+// POST body for one page of the swipe stack: the same filters, minus passed players
+export const swipeBody = (
+  query: ReturnType<typeof scoutQuery>,
+  passed: number[],
+  page: number,
+) => ({
+  ...query,
+  limit: SWIPE_PAGE,
+  page,
+  ...(passed.length && { excludeIds: passed }),
+});

@@ -12,11 +12,6 @@ use rusqlite::{params_from_iter, types::Value as SqlValue, Connection, OpenFlags
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
 };
 
 /// Columns before the per-attribute ones, in insert order, with their SQL types.
@@ -115,26 +110,12 @@ fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag) -> 
     )?;
     check(cancel)?;
     tx.commit()?;
-    // Index creation is interruptible too, not only the insertion loop.
-    let interrupt = db.get_interrupt_handle();
-    let done = Arc::new(AtomicBool::new(false));
-    std::thread::scope(|scope| -> Result<()> {
-        let stopped = done.clone();
-        scope.spawn(move || {
-            while !stopped.load(Ordering::Relaxed) {
-                if cancel.is_cancelled() {
-                    interrupt.interrupt();
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(10));
-            }
-        });
-        let result = db.execute_batch(INDEXES);
-        done.store(true, Ordering::Relaxed);
-        check(cancel)?;
-        result?;
-        Ok(())
-    })?;
+    // Index creation is interruptible too: SQLite asks the handler every 1000 steps.
+    let flag = cancel.clone();
+    db.progress_handler(1000, Some(move || flag.is_cancelled()));
+    let result = db.execute_batch(INDEXES);
+    check(cancel)?;
+    result?;
     Ok(())
 }
 pub(super) fn open_snapshot(path: &Path) -> Result<Connection> {

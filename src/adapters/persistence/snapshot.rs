@@ -63,7 +63,7 @@ fn optional<T: Into<SqlValue>>(value: Option<T>) -> SqlValue {
     value.map_or(SqlValue::Null, Into::into)
 }
 
-pub fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag) -> Result<()> {
+fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag) -> Result<()> {
     let mut db: Connection = Connection::open(path)?;
     let columns = player_columns();
     db.execute_batch(&format!(
@@ -137,13 +137,13 @@ pub fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag)
     })?;
     Ok(())
 }
-pub fn open_snapshot(path: &Path) -> Result<Connection> {
+pub(super) fn open_snapshot(path: &Path) -> Result<Connection> {
     Ok(Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY,
     )?)
 }
-pub fn metadata(db: &Connection) -> Result<SnapshotMeta> {
+fn metadata(db: &Connection) -> Result<SnapshotMeta> {
     let raw: String = db.query_row("SELECT value FROM metadata WHERE key='snapshot'", [], |r| {
         r.get(0)
     })?;

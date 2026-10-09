@@ -1,5 +1,5 @@
 mod support;
-use fm_savelens_backend::adapters::{parser::parse_save, persistence::snapshot};
+use fm_savelens_backend::adapters::parser::parse_save;
 use fm_savelens_backend::utils::cancel::CancelFlag;
 use serde_json::json;
 
@@ -10,9 +10,8 @@ fn search_filters_contract_end_and_value_in_sql() {
     let path = dir.path().join("s.fm");
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
-    let dbpath = dir.path().join("s.sqlite");
-    support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
-    rusqlite::Connection::open(&dbpath)
+    let db = support::create_snapshot(dir.path(), save, &cancel).unwrap();
+    rusqlite::Connection::open(&db.path)
         .unwrap()
         .execute_batch(
             "UPDATE players SET value=NULL, contract_end=NULL;
@@ -21,56 +20,52 @@ fn search_filters_contract_end_and_value_in_sql() {
          UPDATE players SET contract_end='2056-06-30', value=1000000 WHERE id=3;",
         )
         .unwrap();
-    let db = snapshot::open_snapshot(&dbpath).unwrap();
-    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     // inclusive cutoff; players without a contract never match
     assert_eq!(total("contractEndMax=2053-06-30"), 1);
     assert_eq!(total("contractEndMax=2053-07-01"), 2);
     assert_eq!(total("valueMax=4000000"), 2);
     assert_eq!(total("valueMax=4000000&contractEndMax=2053-07-01"), 1);
-    assert!(support::search(&db, "contractEndMax=soon").is_err());
-    assert!(support::search(&db, "valueMax=-1").is_err());
+    assert!(db.search("contractEndMax=soon").is_err());
+    assert!(db.search("valueMax=-1").is_err());
 }
 
-fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
+fn snapshot(dir: &tempfile::TempDir) -> support::TestSnapshot {
     let cancel = CancelFlag::new();
     let path = dir.path().join("t.fm");
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
-    let dbpath = dir.path().join("t.sqlite");
-    support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
-    dbpath
+    support::create_snapshot(dir.path(), save, &cancel).unwrap()
 }
 
 #[test]
 fn main_position_is_the_best_rated_position() {
     let dir = tempfile::tempdir().unwrap();
-    let db = snapshot::open_snapshot(&snapshot(&dir)).unwrap();
-    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let db = snapshot(&dir);
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     // every fixture player is a striker (position 12)
     assert_eq!(total("mainPosition=12"), 64);
     assert_eq!(total("mainPosition=3"), 0);
     assert_eq!(total("mainPosition=3,12"), 64);
-    assert!(support::search(&db, "mainPosition=99").is_err());
+    assert!(db.search("mainPosition=99").is_err());
 }
 
 #[test]
 fn unknown_value_and_excluded_ids() {
     let dir = tempfile::tempdir().unwrap();
-    let dbpath = snapshot(&dir);
-    rusqlite::Connection::open(&dbpath)
+    let db = snapshot(&dir);
+    rusqlite::Connection::open(&db.path)
         .unwrap()
         .execute_batch(
             "UPDATE players SET value=1000000; UPDATE players SET value=NULL WHERE id IN (1,2);",
         )
         .unwrap();
-    let db = snapshot::open_snapshot(&dbpath).unwrap();
-    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=1000000"), 62);
     assert_eq!(total("valueMax=1000000&valueUnknown=1"), 64);
     assert_eq!(total("excludeIds=1,2,3"), 61);
     assert_eq!(total("excludeIds="), 64);
-    assert!(support::search(&db, "excludeIds=1,x").is_err());
+    assert!(db.search("excludeIds=1,x").is_err());
 }
 
 #[test]
@@ -91,9 +86,9 @@ fn post_body_becomes_the_same_query_as_get() {
 #[test]
 fn zero_value_in_the_save_is_stored_as_unknown() {
     let dir = tempfile::tempdir().unwrap();
-    let db = snapshot::open_snapshot(&snapshot(&dir)).unwrap();
+    let db = snapshot(&dir);
     // fixture players carry a value of 0, which must not count as cheap
-    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=5000000"), 0);
     assert_eq!(total("valueMax=5000000&valueUnknown=1"), 64);
 }
@@ -101,16 +96,15 @@ fn zero_value_in_the_save_is_stored_as_unknown() {
 #[test]
 fn no_contract_keeps_only_players_without_a_contract_end() {
     let dir = tempfile::tempdir().unwrap();
-    let dbpath = snapshot(&dir);
-    rusqlite::Connection::open(&dbpath)
+    let db = snapshot(&dir);
+    rusqlite::Connection::open(&db.path)
         .unwrap()
         .execute_batch(
             "UPDATE players SET contract_end=NULL;
          UPDATE players SET contract_end='2056-06-30' WHERE id=3;",
         )
         .unwrap();
-    let db = snapshot::open_snapshot(&dbpath).unwrap();
-    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("noContract=1"), 63);
     assert_eq!(total(""), 64);
 }

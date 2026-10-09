@@ -2,7 +2,7 @@ mod support;
 use fm_savelens_backend::utils::cancel::CancelFlag;
 use fm_savelens_backend::{
     adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
-    adapters::persistence::{snapshot, SqliteSnapshotRepository},
+    adapters::persistence::SqliteSnapshotRepository,
     application::use_cases::saves::SnapshotRepository,
     domain::{
         catalog::CATALOG,
@@ -88,30 +88,20 @@ fn compressed_and_plain_records_match_and_query_correctly() {
         assert_eq!(save.diagnostics["ambiguous"], 0);
         assert_eq!(save.diagnostics["unbound"], 0);
         assert_eq!(fs::read(&path).unwrap(), before);
-        let dbpath = dir.path().join(format!("{compressed}.sqlite"));
         variants.push(serde_json::to_value(&save.players).unwrap());
-        support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
-        let db = snapshot::open_snapshot(&dbpath).unwrap();
-        let first = support::search(
-            &db,
-            "q=alvaro&nation=12&position=12&attr_pace=13&caMin=200&paMax=199&limit=25",
-        )
-        .unwrap();
+        let db = support::create_snapshot(dir.path(), save, &cancel).unwrap();
+        let first = db
+            .search("q=alvaro&nation=12&position=12&attr_pace=13&caMin=200&paMax=199&limit=25")
+            .unwrap();
         assert_eq!(first["total"], 64);
         assert_eq!(first["players"].as_array().unwrap().len(), 25);
-        let second = support::search(&db, "limit=25&page=2").unwrap();
+        let second = db.search("limit=25&page=2").unwrap();
         assert_ne!(first["players"][0]["id"], second["players"][0]["id"]);
-        assert_eq!(support::search(&db, "q=%25").unwrap()["total"], 0);
-        assert_eq!(support::search(&db, "club=-1").unwrap()["total"], 64);
+        assert_eq!(db.search("q=%25").unwrap()["total"], 0);
+        assert_eq!(db.search("club=-1").unwrap()["total"], 64);
         for field in ["age", "ca", "pa"] {
-            assert_eq!(
-                support::search(&db, &format!("{field}Min=250")).unwrap()["total"],
-                0
-            );
-            assert_eq!(
-                support::search(&db, &format!("{field}Max=250")).unwrap()["total"],
-                64
-            );
+            assert_eq!(db.search(&format!("{field}Min=250")).unwrap()["total"], 0);
+            assert_eq!(db.search(&format!("{field}Max=250")).unwrap()["total"], 64);
         }
         for q in [
             "paMin=-1",
@@ -123,13 +113,9 @@ fn compressed_and_plain_records_match_and_query_correctly() {
             "limit=0",
             "attr_pace=21",
         ] {
-            assert!(support::search(&db, q).is_err(), "{q}");
+            assert!(db.search(q).is_err(), "{q}");
         }
-        assert!(
-            fm_savelens_backend::adapters::persistence::player::player(&db, 99999)
-                .unwrap()
-                .is_none()
-        );
+        assert!(db.player(99999).unwrap().is_none());
     }
     assert_eq!(variants[0], variants[1]);
 }
@@ -260,15 +246,13 @@ fn foreign_ability_ownership_is_excluded_and_sorting_is_directional() {
     assert_eq!(save.players.len(), 63);
     assert!(!save.players.iter().any(|p| p.id == 1));
     assert_eq!(save.players.iter().find(|p| p.id == 2).unwrap().ca, 100);
-    let dbpath = dir.path().join("snapshot.sqlite");
-    support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
-    let db = snapshot::open_snapshot(&dbpath).unwrap();
+    let db = support::create_snapshot(dir.path(), save, &cancel).unwrap();
     assert_eq!(
-        support::search(&db, "sort=ca&direction=asc").unwrap()["players"][0]["id"],
+        db.search("sort=ca&direction=asc").unwrap()["players"][0]["id"],
         2
     );
     assert_ne!(
-        support::search(&db, "sort=ca&direction=desc").unwrap()["players"][0]["id"],
+        db.search("sort=ca&direction=desc").unwrap()["players"][0]["id"],
         2
     );
 }

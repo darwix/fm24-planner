@@ -9,7 +9,29 @@ use crate::{
 use rusqlite::{params_from_iter, types::Value as SqlValue, Connection, OptionalExtension};
 use std::path::PathBuf;
 
-pub fn player(db: &Connection, id: u32) -> Result<Option<PlayerDetail>> {
+/// Player queries on the snapshot files in `dir`.
+pub struct SqlitePlayerRepository {
+    dir: PathBuf,
+}
+impl SqlitePlayerRepository {
+    pub fn new(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+}
+
+impl PlayerRepository for SqlitePlayerRepository {
+    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Option<PlayerDetail>> {
+        player(&open_snapshot(&snapshot_file(&self.dir, snapshot)?)?, id)
+    }
+    fn search(&self, snapshot: &SnapshotId, filter: &PlayerFilter) -> Result<PlayerPage> {
+        search(
+            &open_snapshot(&snapshot_file(&self.dir, snapshot)?)?,
+            filter,
+        )
+    }
+}
+
+fn player(db: &Connection, id: u32) -> Result<Option<PlayerDetail>> {
     let raw: Option<String> = db
         .query_row("SELECT detail FROM players WHERE id=?", [id], |r| r.get(0))
         .optional()?;
@@ -22,7 +44,7 @@ fn escape_like(text: &str) -> String {
         .replace('_', "\\_")
 }
 
-pub fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
+fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
     let mut clauses: Vec<String> = vec![];
     let mut args: Vec<SqlValue> = vec![];
     if let Some(text) = &filter.text {
@@ -151,26 +173,4 @@ pub fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         limit: filter.limit,
         players,
     })
-}
-
-/// Player queries on the snapshot files in `dir`.
-pub struct SqlitePlayerRepository {
-    dir: PathBuf,
-}
-impl SqlitePlayerRepository {
-    pub fn new(dir: PathBuf) -> Self {
-        Self { dir }
-    }
-}
-
-impl PlayerRepository for SqlitePlayerRepository {
-    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Option<PlayerDetail>> {
-        player(&open_snapshot(&snapshot_file(&self.dir, snapshot)?)?, id)
-    }
-    fn search(&self, snapshot: &SnapshotId, filter: &PlayerFilter) -> Result<PlayerPage> {
-        search(
-            &open_snapshot(&snapshot_file(&self.dir, snapshot)?)?,
-            filter,
-        )
-    }
 }

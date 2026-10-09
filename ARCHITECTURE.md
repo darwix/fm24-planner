@@ -100,7 +100,8 @@ flag. The save and settings use cases share it behind an `Arc`.
 
 ### persistence
 
-Plain lookups and writes, no decisions. `error.rs` maps rusqlite and serde_json errors to `Error`. Each repository opens its SQLite file per request
+Plain lookups and writes, no decisions. Only the repositories are public; tests go through
+them too. `error.rs` maps rusqlite and serde_json errors to `Error`. Each repository opens its SQLite file per request
 (read-only for reads); there is one file per imported save.
 
 - Searches translate a `PlayerFilter` into SQL.

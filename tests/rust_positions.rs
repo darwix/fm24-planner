@@ -1,20 +1,16 @@
 mod support;
-use fm_savelens_backend::utils::cancel::CancelFlag;
-use fm_savelens_backend::{
-    adapters::persistence::snapshot,
-    domain::{
-        catalog::CATALOG,
-        entities::{ParsedSave, Player},
-    },
+use fm_savelens_backend::domain::{
+    catalog::CATALOG,
+    entities::{ParsedSave, Player},
 };
-use rusqlite::Connection;
+use fm_savelens_backend::utils::cancel::CancelFlag;
 use serde_json::{json, Value};
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/position-filters.json")).unwrap()
 }
 
-fn snapshot() -> (tempfile::TempDir, Connection) {
+fn snapshot() -> (tempfile::TempDir, support::TestSnapshot) {
     let dir = tempfile::tempdir().unwrap();
     let players = fixture()["players"]
         .as_array()
@@ -47,9 +43,7 @@ fn snapshot() -> (tempfile::TempDir, Connection) {
         diagnostics: json!({}),
         warnings: vec![],
     };
-    let path = dir.path().join("snapshot.sqlite");
-    support::create_snapshot(&path, save, Default::default(), &CancelFlag::new()).unwrap();
-    let db = snapshot::open_snapshot(&path).unwrap();
+    let db = support::create_snapshot(dir.path(), save, &CancelFlag::new()).unwrap();
     (dir, db)
 }
 
@@ -68,33 +62,30 @@ fn position_queries_match_shared_boundaries_validation_and_pagination() {
     let fixture = fixture();
     for sample in fixture["cases"].as_array().unwrap() {
         let query = sample["query"].as_str().unwrap();
-        let result = support::search(&db, &format!("{query}&sort=ca&direction=asc")).unwrap();
+        let result = db
+            .search(&format!("{query}&sort=ca&direction=asc"))
+            .unwrap();
         assert_eq!(result["total"], sample["total"], "{query}");
         assert_eq!(ids(&result), sample["ids"], "{query}");
     }
     for query in fixture["invalid"].as_array().unwrap() {
-        assert!(
-            support::search(&db, query.as_str().unwrap()).is_err(),
-            "{query}"
-        );
+        assert!(db.search(query.as_str().unwrap()).is_err(), "{query}");
     }
-    let descending = support::search(
-        &db,
-        "position=2,4&positionMatch=or&sort=ca&direction=desc&limit=2&page=2",
-    )
-    .unwrap();
+    let descending = db
+        .search("position=2,4&positionMatch=or&sort=ca&direction=desc&limit=2&page=2")
+        .unwrap();
     assert_eq!(descending["total"], 5);
     assert_eq!(ids(&descending), json!([3, 2]));
-    assert_eq!(support::search(&db, "").unwrap()["total"], 8);
+    assert_eq!(db.search("").unwrap()["total"], 8);
 }
 
 #[test]
 fn positions_combine_with_club_and_attributes_before_counting() {
     let (_dir, db) = snapshot();
     let query = "position=2,4&club=1&attr_pace=16";
-    let and = support::search(&db, query).unwrap();
+    let and = db.search(query).unwrap();
     assert_eq!(and["total"], 1);
     assert_eq!(ids(&and), json!([1]));
-    let or = support::search(&db, &format!("{query}&positionMatch=or")).unwrap();
+    let or = db.search(&format!("{query}&positionMatch=or")).unwrap();
     assert_eq!(or["total"], 2);
 }

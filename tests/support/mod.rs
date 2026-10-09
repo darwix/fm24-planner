@@ -120,31 +120,58 @@ pub fn write_archive(path: &Path, compressed: bool, members: Vec<(&str, Vec<u8>)
     fs::write(path, output).unwrap();
 }
 
-/// Builds a snapshot from a parsed save and writes it to `path`.
+/// A snapshot written through the real repositories, for search tests.
 #[allow(dead_code)]
-pub fn create_snapshot(
-    path: &Path,
-    save: fm_savelens_backend::domain::entities::ParsedSave,
-    meta: fm_savelens_backend::domain::entities::SnapshotMeta,
-    cancel: &fm_savelens_backend::utils::cancel::CancelFlag,
-) -> fm_savelens_backend::Result<()> {
-    fm_savelens_backend::adapters::persistence::snapshot::create_snapshot(
-        path,
-        &fm_savelens_backend::domain::entities::NewSnapshot::from_parsed(save, meta),
-        cancel,
-    )
+pub struct TestSnapshot {
+    /// The SQLite file, for tests that adjust rows directly.
+    pub path: std::path::PathBuf,
+    id: fm_savelens_backend::domain::entities::SnapshotId,
+    players: fm_savelens_backend::adapters::persistence::SqlitePlayerRepository,
+}
+#[allow(dead_code)]
+impl TestSnapshot {
+    /// Parses `query` and searches the snapshot, giving the page as JSON.
+    pub fn search(&self, query: &str) -> fm_savelens_backend::Result<serde_json::Value> {
+        use fm_savelens_backend::{
+            adapters::http::routes::players::filter::parse_filter,
+            application::use_cases::players::PlayerRepository,
+        };
+        let page = self.players.search(&self.id, &parse_filter(query)?)?;
+        Ok(serde_json::to_value(page)?)
+    }
+    pub fn player(
+        &self,
+        id: u32,
+    ) -> fm_savelens_backend::Result<Option<fm_savelens_backend::domain::entities::PlayerDetail>>
+    {
+        use fm_savelens_backend::application::use_cases::players::PlayerRepository;
+        self.players.player(&self.id, id)
+    }
 }
 
-/// Parses `query` and searches the snapshot, giving the page as JSON.
+/// Builds a snapshot from a parsed save and publishes it in `dir` under a fresh id.
 #[allow(dead_code)]
-pub fn search(
-    db: &rusqlite::Connection,
-    query: &str,
-) -> fm_savelens_backend::Result<serde_json::Value> {
-    use fm_savelens_backend::adapters::http::routes::players::filter::parse_filter;
-    let page =
-        fm_savelens_backend::adapters::persistence::player::search(db, &parse_filter(query)?)?;
-    Ok(serde_json::to_value(page)?)
+pub fn create_snapshot(
+    dir: &Path,
+    save: fm_savelens_backend::domain::entities::ParsedSave,
+    cancel: &fm_savelens_backend::utils::cancel::CancelFlag,
+) -> fm_savelens_backend::Result<TestSnapshot> {
+    use fm_savelens_backend::{
+        adapters::persistence::{SqlitePlayerRepository, SqliteSnapshotRepository},
+        application::use_cases::saves::SnapshotRepository,
+        domain::entities::{NewSnapshot, SnapshotId},
+    };
+    let job = uuid::Uuid::new_v4().simple().to_string();
+    let id = SnapshotId::parse(&format!("{job}{job}"))?;
+    let snapshots = SqliteSnapshotRepository::new(dir.to_path_buf());
+    let snapshot = NewSnapshot::from_parsed(save, Default::default());
+    snapshots.create(&job, &snapshot, cancel)?;
+    snapshots.publish(&job, &id)?;
+    Ok(TestSnapshot {
+        path: dir.join(format!("{id}.sqlite")),
+        id,
+        players: SqlitePlayerRepository::new(dir.to_path_buf()),
+    })
 }
 
 /// A save use case over real adapters and snapshots kept in `snapshots`.

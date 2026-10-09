@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthsLeft, toPool } from "./player";
+import { POS_INDEX, scoutQuery, monthsLeft, toPool } from "./player";
 
 describe("monthsLeft", () => {
   it("counts whole months from the game date to the contract end", () => {
@@ -56,5 +56,23 @@ describe("toPool", () => {
     expect(p.left).toBeUndefined();
     expect(p.w).toBeUndefined();
     expect(p.v).toBeUndefined();
+  });
+});
+
+describe("scoutQuery", () => {
+  const f = { pos: "", min: 18, max: 23, exp: false, val: "" as const };
+  it("sends only age, sort and limit when no extra filters are on", () => {
+    expect(scoutQuery(f, "2053-03-01")).toEqual({
+      ageMin: 18,
+      ageMax: 23,
+      sort: "pa",
+      limit: 250,
+    });
+  });
+  it("sends position, expiry cutoff and max value to the backend", () => {
+    const q = scoutQuery({ ...f, pos: "ST", exp: true, val: 2 }, "2053-03-01");
+    expect(q.position).toBe(POS_INDEX.ST);
+    expect(q.contractEndMax).toBe("2054-03-31");
+    expect(q.valueMax).toBe(2_000_000);
   });
 });

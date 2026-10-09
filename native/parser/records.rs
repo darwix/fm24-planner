@@ -180,7 +180,10 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancellationToken) -> Result<Vec
             .map(String::as_str)
             .unwrap_or("");
         let last = names.last.get(l as usize).map(String::as_str).unwrap_or("");
-        let common = names.common.get(u32(b, start + 10) as usize).map(String::as_str);
+        let common = names
+            .common
+            .get(u32(b, start + 10) as usize)
+            .map(String::as_str);
         let name = display_name(first, last, common);
         let name = if name.is_empty() {
             full_name.clone()

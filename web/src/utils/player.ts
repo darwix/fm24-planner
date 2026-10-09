@@ -1,4 +1,4 @@
-import type { PoolPlayer } from "@/models/player";
+import type { PoolPlayer, ScoutFilter } from "@/models/player";
 import type { ApiPlayer } from "@/models/save";
 
 // whole months from the game date to the contract end, undefined when the save has no contract
@@ -13,6 +13,23 @@ export const monthsLeft = (
 };
 
 // index of each UI position in the backend's catalog (GET /api/attributes -> positions)
+// last contract-end date that still counts as expiring (<= 12 months left)
+// ponytail: month-end game dates (e.g. 31 Jan) can overshoot by a day or two
+const expiryCutoff = (now: string) => {
+  const [y, m, d] = now.split("-").map(Number);
+  return new Date(Date.UTC(y, m + 12, d - 1)).toISOString().slice(0, 10);
+};
+
+export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
+  ...(f.pos && { position: POS_INDEX[f.pos] }),
+  ageMin: f.min,
+  ageMax: f.max,
+  ...(f.exp && { contractEndMax: expiryCutoff(gameDate) }),
+  ...(f.val && { valueMax: f.val * 1_000_000 }),
+  sort: "pa",
+  limit: 250,
+});
+
 export const POS_INDEX: Record<string, number> = {
   GK: 0,
   DL: 2,

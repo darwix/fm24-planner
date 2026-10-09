@@ -5,8 +5,7 @@ import { clubState, squadState } from "@/atoms/squadState";
 import type { PoolPlayer, ScoutFilter } from "@/models/player";
 import { useSearch } from "@/services/save";
 import { money, wage } from "@/utils/format";
-import { matchFilter } from "@/utils/logic";
-import { POS_INDEX, toPool } from "@/utils/player";
+import { POS_INDEX, scoutQuery, toPool } from "@/utils/player";
 
 export default function Scouting() {
   const nav = useNavigate();
@@ -16,18 +15,13 @@ export default function Scouting() {
   const club = useRecoilValue(clubState);
   const L = lists[li] ?? lists[0];
   const f = L.f;
-  // the backend ranks by potential; expiry and value are filtered here
-  const found = useSearch(club?.snapshotId, {
-    ...(f.pos && { position: POS_INDEX[f.pos] }),
-    ageMin: f.min,
-    ageMax: f.max,
-    sort: "pa",
-    limit: 250,
-  });
+  // the backend filters and ranks by potential
+  const found = useSearch(
+    club?.snapshotId,
+    club ? scoutQuery(f, club.gameDate) : null,
+  );
   if (!club) return <Navigate to="/upload" replace />;
-  const rows = (found ?? [])
-    .map((p) => toPool(p, club.gameDate))
-    .filter((p) => matchFilter(p, f));
+  const rows = (found ?? []).map((p) => toPool(p, club.gameDate));
   const patch = (next: Partial<ScoutFilter>) =>
     setLists(
       lists.map((l, i) => (i === li ? { ...l, f: { ...l.f, ...next } } : l)),

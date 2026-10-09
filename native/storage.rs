@@ -86,7 +86,9 @@ pub fn create_snapshot(
                 (p.ca as i64).into(),
                 (p.pa as i64).into(),
                 p.wage.map_or(SqlValue::Null, |v| (v as i64).into()),
-                p.contract_end.clone().map_or(SqlValue::Null, SqlValue::Text),
+                p.contract_end
+                    .clone()
+                    .map_or(SqlValue::Null, SqlValue::Text),
                 p.value.map_or(SqlValue::Null, |v| (v as i64).into()),
             ];
             values.extend(CATALOG.attributes.iter().map(|a| {
@@ -300,6 +302,27 @@ fn search_impl(
             args.push(n.into());
         }
     }
+    if let Some(n) = integer("valueMax", 0, 9_007_199_254_740_991)? {
+        clauses.push("value <= ?".into());
+        args.push(n.into());
+    }
+    if let Some(d) = params.get("contractEndMax").filter(|s| !s.is_empty()) {
+        let b = d.as_bytes();
+        let ok = b.len() == 10
+            && b.iter().enumerate().all(|(i, c)| {
+                if i == 4 || i == 7 {
+                    *c == b'-'
+                } else {
+                    c.is_ascii_digit()
+                }
+            });
+        if !ok {
+            return Err(Error::query("Invalid contractEndMax. Expected YYYY-MM-DD."));
+        }
+        // ISO dates compare as text; NULL contracts never match
+        clauses.push("contract_end <= ?".into());
+        args.push(d.clone().into());
+    }
     if let Some(n) = integer("club", -1, 100000)? {
         if n == -1 {
             clauses.push("club_id IS NULL".into())
@@ -446,7 +469,22 @@ fn search_impl(
     })?;
     let mut players = vec![];
     for row in rows {
-        let (id, uid, name, age, club_id, club, nations, positions, ca, pa, role_rating, wage, contract_end, value) = row?;
+        let (
+            id,
+            uid,
+            name,
+            age,
+            club_id,
+            club,
+            nations,
+            positions,
+            ca,
+            pa,
+            role_rating,
+            wage,
+            contract_end,
+            value,
+        ) = row?;
         let nations: Vec<u32> = serde_json::from_str(&nations)?;
         let positions: Value = serde_json::from_str(&positions)?;
         let mut player = json!({"id":id,"uid":uid,"name":name,"age":age,"club_id":club_id,"club":club,"nationalities":nations.into_iter().map(nation_name).collect::<Vec<_>>(),"positions":positions,"ca":ca,"pa":pa,"wage":wage,"contractEnd":contract_end,"value":value});

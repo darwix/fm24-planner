@@ -16,22 +16,42 @@ fn check(hex: &str, eid: u32, wage: u32, end: &str) {
 
 #[test]
 fn pietrangeli_wage_and_expiry() {
-    check(include_str!("fixtures/pietrangeli.hex"), 448321, 455_280, "2056-06-30");
+    check(
+        include_str!("fixtures/pietrangeli.hex"),
+        448321,
+        455_280,
+        "2056-06-30",
+    );
 }
 
 #[test]
 fn krznar_wage_and_expiry() {
-    check(include_str!("fixtures/krznar.hex"), 529029, 229_641, "2057-06-30");
+    check(
+        include_str!("fixtures/krznar.hex"),
+        529029,
+        229_641,
+        "2057-06-30",
+    );
 }
 
 #[test]
 fn ziglam_wage_and_expiry() {
-    check(include_str!("fixtures/ziglam.hex"), 637473, 3_520, "2054-06-30");
+    check(
+        include_str!("fixtures/ziglam.hex"),
+        637473,
+        3_520,
+        "2054-06-30",
+    );
 }
 
 #[test]
 fn loaned_player_reads_the_parent_contract_not_the_zero_wage_loan_row() {
-    check(include_str!("fixtures/ruiz.hex"), 499757, 39_146, "2054-06-30");
+    check(
+        include_str!("fixtures/ruiz.hex"),
+        499757,
+        39_146,
+        "2054-06-30",
+    );
 }
 
 #[test]
@@ -51,5 +71,10 @@ fn value_is_the_u32_54_bytes_after_the_ability_block() {
 
 #[test]
 fn year_2047_sentinel_is_not_an_expiry() {
-    check(include_str!("fixtures/fornies.hex"), 567917, 17_508, "2056-06-30");
+    check(
+        include_str!("fixtures/fornies.hex"),
+        567917,
+        17_508,
+        "2056-06-30",
+    );
 }

@@ -12,13 +12,15 @@ fn search_filters_contract_end_and_value_in_sql() {
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let dbpath = dir.path().join("s.sqlite");
     storage::create_snapshot(&dbpath, &save, json!({}), &cancel).unwrap();
-    let db = storage::open_snapshot(&dbpath).unwrap();
-    db.execute_batch(
-        "UPDATE players SET contract_end='2053-06-30', value=4000000 WHERE id=1;
+    rusqlite::Connection::open(&dbpath)
+        .unwrap()
+        .execute_batch(
+            "UPDATE players SET contract_end='2053-06-30', value=4000000 WHERE id=1;
          UPDATE players SET contract_end='2053-07-01', value=9000000 WHERE id=2;
          UPDATE players SET contract_end='2056-06-30', value=1000000 WHERE id=3;",
-    )
-    .unwrap();
+        )
+        .unwrap();
+    let db = storage::open_snapshot(&dbpath).unwrap();
     let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
     // inclusive cutoff; players without a contract never match
     assert_eq!(total("contractEndMax=2053-06-30"), 1);

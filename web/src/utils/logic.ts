@@ -1,10 +1,4 @@
-import type {
-  Candidate,
-  PoolPlayer,
-  ScoutFilter,
-  SquadPlayer,
-  Tag,
-} from "@/models/player";
+import type { Candidate, PoolPlayer, SquadPlayer, Tag } from "@/models/player";
 
 export const TARGET: Record<string, number> = {
   GK: 2,
@@ -23,16 +17,6 @@ export const inGroup = (s: Pick<SquadPlayer, "p" | "cover">, pos: string) =>
 
 export const need = (squad: Pick<SquadPlayer, "p" | "cover">[], pos: string) =>
   Math.max(0, TARGET[pos] - squad.filter((s) => inGroup(s, pos)).length);
-
-export const matchFilter = (
-  p: Pick<PoolPlayer, "p" | "a" | "left" | "v">,
-  f: ScoutFilter,
-) =>
-  (!f.pos || p.p === f.pos) &&
-  p.a >= f.min &&
-  p.a <= f.max &&
-  (!f.exp || (p.left !== undefined && p.left <= 12)) &&
-  (!f.val || (p.v !== undefined && p.v <= f.val));
 
 // ponytail: match = how close CA is to the player being replaced; attribute-profile matching comes later
 export const asCandidate = (

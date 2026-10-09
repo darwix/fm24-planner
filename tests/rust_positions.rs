@@ -1,3 +1,4 @@
+mod support;
 use fm_savelens_backend::{
     parser::{ParsedSave, Player, CATALOG},
     storage,
@@ -44,7 +45,7 @@ fn snapshot() -> (tempfile::TempDir, Connection) {
         warnings: vec![],
     };
     let path = dir.path().join("snapshot.sqlite");
-    storage::create_snapshot(&path, &save, json!({}), &CancellationToken::new()).unwrap();
+    support::create_snapshot(&path, save, json!({}), &CancellationToken::new()).unwrap();
     let db = storage::open_snapshot(&path).unwrap();
     (dir, db)
 }
@@ -64,33 +65,33 @@ fn position_queries_match_shared_boundaries_validation_and_pagination() {
     let fixture = fixture();
     for sample in fixture["cases"].as_array().unwrap() {
         let query = sample["query"].as_str().unwrap();
-        let result = storage::search(&db, &format!("{query}&sort=ca&direction=asc")).unwrap();
+        let result = support::search(&db, &format!("{query}&sort=ca&direction=asc")).unwrap();
         assert_eq!(result["total"], sample["total"], "{query}");
         assert_eq!(ids(&result), sample["ids"], "{query}");
     }
     for query in fixture["invalid"].as_array().unwrap() {
         assert!(
-            storage::search(&db, query.as_str().unwrap()).is_err(),
+            support::search(&db, query.as_str().unwrap()).is_err(),
             "{query}"
         );
     }
-    let descending = storage::search(
+    let descending = support::search(
         &db,
         "position=2,4&positionMatch=or&sort=ca&direction=desc&limit=2&page=2",
     )
     .unwrap();
     assert_eq!(descending["total"], 5);
     assert_eq!(ids(&descending), json!([3, 2]));
-    assert_eq!(storage::search(&db, "").unwrap()["total"], 8);
+    assert_eq!(support::search(&db, "").unwrap()["total"], 8);
 }
 
 #[test]
 fn positions_combine_with_club_and_attributes_before_counting() {
     let (_dir, db) = snapshot();
     let query = "position=2,4&club=1&attr_pace=16";
-    let and = storage::search(&db, query).unwrap();
+    let and = support::search(&db, query).unwrap();
     assert_eq!(and["total"], 1);
     assert_eq!(ids(&and), json!([1]));
-    let or = storage::search(&db, &format!("{query}&positionMatch=or")).unwrap();
+    let or = support::search(&db, &format!("{query}&positionMatch=or")).unwrap();
     assert_eq!(or["total"], 2);
 }

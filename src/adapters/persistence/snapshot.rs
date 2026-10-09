@@ -1,145 +1,130 @@
-use super::nation_name;
 use crate::{
     application::use_cases::ports::SnapshotRepository,
-    domain::entities::SnapshotId,
-    parser::{archive::check, ParsedSave, CATALOG, PARSER_VERSION},
-    utils::text::normalize,
+    domain::{
+        catalog::CATALOG,
+        entities::{NewSnapshot, SnapshotId},
+    },
+    utils::cancel::check,
     Error, Result,
 };
-use chrono::Utc;
 use rusqlite::{params_from_iter, types::Value as SqlValue, Connection, OpenFlags};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{
-    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
 use tokio_util::sync::CancellationToken;
 
+/// Columns before the per-attribute ones, in insert order.
+const PLAYER_COLUMNS: [&str; 19] = [
+    "id",
+    "uid",
+    "name",
+    "full_name",
+    "search_name",
+    "age",
+    "club_id",
+    "club",
+    "nation_id",
+    "nations",
+    "nationalities",
+    "positions",
+    "position_mask",
+    "main_position",
+    "ca",
+    "pa",
+    "wage",
+    "contract_end",
+    "value",
+];
+const INDEXES: &str = "CREATE INDEX idx_players_pa ON players(pa DESC,ca DESC,id); CREATE INDEX idx_players_ca ON players(ca); CREATE INDEX idx_players_age ON players(age); CREATE INDEX idx_players_club ON players(club_id); CREATE INDEX idx_players_nation ON players(nation_id); PRAGMA optimize;";
+
+fn optional<T: Into<SqlValue>>(value: Option<T>) -> SqlValue {
+    value.map_or(SqlValue::Null, Into::into)
+}
+
 pub fn create_snapshot(
     path: &Path,
-    save: &ParsedSave,
-    mut meta: Value,
+    snapshot: &NewSnapshot,
     cancel: &CancellationToken,
 ) -> Result<()> {
     let mut db: Connection = Connection::open(path)?;
     let attributes: String = CATALOG
         .attributes
         .iter()
-        .map(|a| format!("attr_{} INTEGER", a.key))
-        .collect::<Vec<_>>()
-        .join(",");
+        .map(|a| format!(",attr_{} INTEGER", a.key))
+        .collect();
     db.execute_batch(&format!("CREATE TABLE metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE players (
         id INTEGER PRIMARY KEY,uid INTEGER NOT NULL,name TEXT NOT NULL,full_name TEXT NOT NULL,search_name TEXT NOT NULL,
-        age INTEGER,club_id INTEGER,club TEXT,nation_id INTEGER,nations TEXT NOT NULL,positions TEXT NOT NULL,position_mask INTEGER NOT NULL,main_position INTEGER NOT NULL,
-        ca INTEGER,pa INTEGER,wage INTEGER,contract_end TEXT,value INTEGER,{attributes},detail TEXT NOT NULL);"))?;
+        age INTEGER,club_id INTEGER,club TEXT,nation_id INTEGER,nations TEXT NOT NULL,nationalities TEXT NOT NULL,positions TEXT NOT NULL,position_mask INTEGER NOT NULL,main_position INTEGER NOT NULL,
+        ca INTEGER,pa INTEGER,wage INTEGER,contract_end TEXT,value INTEGER{attributes},detail TEXT NOT NULL);"))?;
     let tx = db.transaction()?;
     {
-        let placeholders = vec!["?"; 19 + CATALOG.attributes.len()].join(",");
-        let mut insert = tx.prepare(&format!("INSERT INTO players VALUES ({placeholders})"))?;
-        for p in &save.players {
+        let columns = PLAYER_COLUMNS.len() + CATALOG.attributes.len() + 1;
+        let mut insert = tx.prepare(&format!(
+            "INSERT INTO players VALUES ({})",
+            vec!["?"; columns].join(",")
+        ))?;
+        for p in &snapshot.players {
             check(cancel)?;
-            let mut nations = vec![p.nation_id as u32];
-            nations.extend(&p.other_nation_ids);
-            let mut detail = serde_json::to_value(p)?;
-            detail["nationalities"] = json!(nations
-                .iter()
-                .map(|&id| nation_name(id))
-                .collect::<Vec<_>>());
             let mut values: Vec<SqlValue> = vec![
-                (p.id as i64).into(),
-                (p.uid as i64).into(),
+                p.id.into(),
+                p.uid.into(),
                 p.name.clone().into(),
                 p.full_name.clone().into(),
-                normalize(&format!("{} {} {}", p.name, p.full_name, p.uid)).into(),
-                (p.age as i64).into(),
-                p.club_id.map_or(SqlValue::Null, |id| (id as i64).into()),
-                p.club.clone().map_or(SqlValue::Null, SqlValue::Text),
-                (p.nation_id as i64).into(),
-                serde_json::to_string(&nations)?.into(),
+                p.search_name.clone().into(),
+                p.age.into(),
+                optional(p.club_id),
+                optional(p.club.clone()),
+                p.nation_id.into(),
+                serde_json::to_string(&p.nation_ids)?.into(),
+                serde_json::to_string(&p.nationalities)?.into(),
                 serde_json::to_string(&p.positions)?.into(),
-                p.position_ratings
-                    .iter()
-                    .enumerate()
-                    .fold(
-                        0i64,
-                        |mask, (i, v)| if *v >= 15 { mask | (1 << i) } else { mask },
-                    )
-                    .into(),
-                // best-rated position (first on ties); the stored `positions` list is catalog order
-                (p.position_ratings
-                    .iter()
-                    .enumerate()
-                    .fold(
-                        (0usize, 0u8),
-                        |best, (i, v)| if *v > best.1 { (i, *v) } else { best },
-                    )
-                    .0 as i64)
-                    .into(),
-                (p.ca as i64).into(),
-                (p.pa as i64).into(),
-                p.wage.map_or(SqlValue::Null, |v| (v as i64).into()),
-                p.contract_end
-                    .clone()
-                    .map_or(SqlValue::Null, SqlValue::Text),
-                // a value of 0 means the save has none, so keep it unknown
-                p.value
-                    .filter(|v| *v > 0)
-                    .map_or(SqlValue::Null, |v| (v as i64).into()),
+                p.position_mask.into(),
+                (p.main_position as i64).into(),
+                p.ca.into(),
+                p.pa.into(),
+                optional(p.wage),
+                optional(p.contract_end.clone()),
+                optional(p.value),
             ];
-            values.extend(CATALOG.attributes.iter().map(|a| {
-                p.attributes
-                    .get(&a.key)
-                    .map_or(SqlValue::Null, |v| (*v as i64).into())
-            }));
-            values.push(serde_json::to_string(&detail)?.into());
+            values.extend(
+                CATALOG
+                    .attributes
+                    .iter()
+                    .map(|a| optional(p.attributes.get(&a.key).copied())),
+            );
+            values.push(serde_json::to_string(&p.detail)?.into());
             insert.execute(params_from_iter(values))?;
         }
     }
-    let ids: BTreeSet<u32> = save
-        .players
-        .iter()
-        .flat_map(|p| std::iter::once(p.nation_id as u32).chain(p.other_nation_ids.iter().copied()))
-        .collect();
-    let mut nations: Vec<_> = ids
-        .into_iter()
-        .map(|id| json!({"id":id,"name":nation_name(id)}))
-        .collect();
-    nations.sort_by_key(|v| normalize(v["name"].as_str().unwrap_or("")));
-    let used: BTreeSet<_> = save.players.iter().filter_map(|p| p.club_id).collect();
-    let mut clubs: Vec<_> = save
-        .clubs
-        .iter()
-        .filter(|c| used.contains(&c.id))
-        .map(|c| json!({"id":c.id,"name":c.short_name}))
-        .collect();
-    clubs.sort_by_key(|v| normalize(v["name"].as_str().unwrap_or("")));
-    let fields = json!({"name":save.name,"gameDate":save.game_date,"formatVersion":save.format_version,"playerCount":save.players.len(),"diagnostics":save.diagnostics,"warnings":save.warnings,"importedAt":Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis,true),"nations":nations,"clubs":clubs,"managedClubId":save.managed_club_id});
-    meta.as_object_mut()
-        .ok_or_else(|| Error::query("Invalid snapshot metadata."))?
-        .extend(fields.as_object().unwrap().clone());
     tx.execute(
         "INSERT INTO metadata VALUES ('snapshot',?)",
-        [serde_json::to_string(&meta)?],
+        [serde_json::to_string(&snapshot.meta)?],
     )?;
     check(cancel)?;
     tx.commit()?;
     // Index creation is interruptible too, not only the insertion loop.
     let interrupt = db.get_interrupt_handle();
-    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let done = Arc::new(AtomicBool::new(false));
     std::thread::scope(|scope| -> Result<()> {
         let stopped = done.clone();
         scope.spawn(move || {
-            while !stopped.load(std::sync::atomic::Ordering::Relaxed) {
+            while !stopped.load(Ordering::Relaxed) {
                 if cancel.is_cancelled() {
                     interrupt.interrupt();
                     break;
                 }
-                std::thread::sleep(std::time::Duration::from_millis(10));
+                std::thread::sleep(Duration::from_millis(10));
             }
         });
-        let result = db.execute_batch("CREATE INDEX idx_players_pa ON players(pa DESC,ca DESC,id); CREATE INDEX idx_players_ca ON players(ca); CREATE INDEX idx_players_age ON players(age); CREATE INDEX idx_players_club ON players(club_id); CREATE INDEX idx_players_nation ON players(nation_id); PRAGMA optimize;");
-        done.store(true, std::sync::atomic::Ordering::Relaxed);
+        let result = db.execute_batch(INDEXES);
+        done.store(true, Ordering::Relaxed);
         check(cancel)?;
         result?;
         Ok(())
@@ -156,15 +141,7 @@ pub fn metadata(db: &Connection) -> Result<Value> {
     let raw: String = db.query_row("SELECT value FROM metadata WHERE key='snapshot'", [], |r| {
         r.get(0)
     })?;
-    let mut m: Value = serde_json::from_str(&raw)?;
-    m["stale"] = json!(
-        std::fs::metadata(m["sourcePath"].as_str().unwrap_or("")).map_or(true, |s| {
-            s.len() != m["sourceSize"].as_u64().unwrap_or(0)
-                || crate::utils::files::mtime(&s).ok() != m["sourceMtime"].as_f64()
-                || m["parserVersion"].as_str() != Some(PARSER_VERSION)
-        })
-    );
-    Ok(m)
+    Ok(serde_json::from_str(&raw)?)
 }
 
 /// One SQLite file per imported save, kept in `dir`.
@@ -196,11 +173,10 @@ impl SnapshotRepository for SqliteSnapshotRepository {
     fn create(
         &self,
         job_id: &str,
-        save: &ParsedSave,
-        meta: Value,
+        snapshot: &NewSnapshot,
         cancel: &CancellationToken,
     ) -> Result<()> {
-        create_snapshot(&self.partial(job_id), save, meta, cancel)
+        create_snapshot(&self.partial(job_id), snapshot, cancel)
     }
     fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()> {
         fs::rename(self.partial(job_id), self.dir.join(format!("{id}.sqlite")))?;

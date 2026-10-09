@@ -119,3 +119,60 @@ pub fn write_archive(path: &Path, compressed: bool, members: Vec<(&str, Vec<u8>)
     output.extend(zstd::stream::encode_all(&manifest[..], 1).unwrap());
     fs::write(path, output).unwrap();
 }
+
+/// Builds a snapshot from a parsed save and writes it to `path`.
+#[allow(dead_code)]
+pub fn create_snapshot(
+    path: &Path,
+    save: fm_savelens_backend::domain::entities::ParsedSave,
+    meta: serde_json::Value,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> fm_savelens_backend::Result<()> {
+    use fm_savelens_backend::application::use_cases::build_snapshot;
+    fm_savelens_backend::storage::create_snapshot(path, &build_snapshot(save, meta)?, cancel)
+}
+
+/// Parses `query` and searches the snapshot, giving the page as JSON.
+#[allow(dead_code)]
+pub fn search(
+    db: &rusqlite::Connection,
+    query: &str,
+) -> fm_savelens_backend::Result<serde_json::Value> {
+    use fm_savelens_backend::adapters::http::dto::player_query::parse_filter;
+    let page = fm_savelens_backend::storage::search(db, &parse_filter(query)?)?;
+    Ok(serde_json::to_value(page)?)
+}
+
+/// A save use case over real adapters and snapshots kept in `snapshots`.
+#[allow(dead_code)]
+pub fn save_use_case(
+    snapshots: std::path::PathBuf,
+) -> fm_savelens_backend::application::use_cases::SaveUseCase {
+    use fm_savelens_backend::{
+        adapters::{
+            parser::reader::FmSaveReader,
+            persistence::{FsSaveFiles, SqliteSnapshotRepository},
+        },
+        application::use_cases::{ports::SettingsRepository, SaveUseCase, Session},
+        domain::entities::Settings,
+    };
+    use std::sync::Arc;
+    struct MemorySettings;
+    impl SettingsRepository for MemorySettings {
+        fn load(&self) -> fm_savelens_backend::Result<Settings> {
+            Ok(Settings {
+                folder: String::new(),
+                last_snapshot: None,
+            })
+        }
+        fn save(&self, _: &Settings) -> fm_savelens_backend::Result<()> {
+            Ok(())
+        }
+    }
+    SaveUseCase::new(
+        Session::new(Arc::new(MemorySettings)).unwrap(),
+        Arc::new(FmSaveReader),
+        Arc::new(FsSaveFiles),
+        Arc::new(SqliteSnapshotRepository::new(snapshots)),
+    )
+}

@@ -1,6 +1,7 @@
 use crate::{
     application::use_cases::{
         session::{Active, Completion},
+        snapshot_builder::build_snapshot,
         SaveUseCase,
     },
     domain::entities::{Job, SaveFile, SnapshotId},
@@ -107,12 +108,12 @@ impl SaveUseCase {
                         job.message = message.into();
                     }
                 })?;
-                self.snapshots.create(
-                    &active.id,
-                    &parsed,
+                let players = parsed.players.len();
+                let snapshot = build_snapshot(
+                    parsed,
                     json!({"snapshotId":save.snapshot_id,"sourcePath":file,"sourceName":save.name,"sourceSize":save.size,"sourceMtime":save.mtime,"parserVersion":self.reader.version()}),
-                    &active.cancel,
                 )?;
+                self.snapshots.create(&active.id, &snapshot, &active.cancel)?;
                 let after = self.files.stat(&file)?;
                 if after.size != before.size || after.modified != before.modified {
                     return Err(Error::new(
@@ -136,9 +137,9 @@ impl SaveUseCase {
                 job.status = "complete".into();
                 job.progress = 100;
                 job.message = "Ready".into();
-                job.player_count = Some(parsed.players.len());
+                job.player_count = Some(players);
                 job.elapsed_ms = Some(start.elapsed().as_millis());
-                Ok(parsed.players.len())
+                Ok(players)
             }))
             .unwrap_or_else(|_| {
                 Err(Error::new(

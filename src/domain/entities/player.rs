@@ -27,3 +27,33 @@ pub struct Player {
     pub value: Option<u32>,
     pub source: Value,
 }
+
+/// A position rating at or above this means the player can play there.
+const PLAYABLE_RATING: u8 = 15;
+
+impl Player {
+    /// Bit `i` is set when the player can play position `i`.
+    pub fn position_mask(&self) -> i64 {
+        self.position_ratings
+            .iter()
+            .enumerate()
+            .fold(0, |mask, (i, v)| {
+                if *v >= PLAYABLE_RATING {
+                    mask | (1 << i)
+                } else {
+                    mask
+                }
+            })
+    }
+    /// The best-rated position (first on ties); `positions` is in catalog order.
+    pub fn main_position(&self) -> usize {
+        self.position_ratings
+            .iter()
+            .enumerate()
+            .fold(
+                (0, 0),
+                |best, (i, v)| if *v > best.1 { (i, *v) } else { best },
+            )
+            .0
+    }
+}

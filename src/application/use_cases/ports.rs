@@ -1,5 +1,8 @@
 use crate::{
-    domain::entities::{ParsedSave, Settings, SnapshotId, SourceFile},
+    domain::entities::{
+        NewSnapshot, ParsedSave, PlayerDetail, PlayerFilter, PlayerPage, Settings, SnapshotId,
+        SourceFile,
+    },
     Result,
 };
 use serde_json::Value;
@@ -40,8 +43,7 @@ pub trait SnapshotRepository: Send + Sync {
     fn create(
         &self,
         job_id: &str,
-        save: &ParsedSave,
-        meta: Value,
+        snapshot: &NewSnapshot,
         cancel: &CancellationToken,
     ) -> Result<()>;
     fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()>;
@@ -53,6 +55,6 @@ pub trait SnapshotRepository: Send + Sync {
 
 /// Reads players from an imported snapshot.
 pub trait PlayerRepository: Send + Sync {
-    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Value>;
-    fn search(&self, snapshot: &SnapshotId, query: &str) -> Result<Value>;
+    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Option<PlayerDetail>>;
+    fn search(&self, snapshot: &SnapshotId, filter: &PlayerFilter) -> Result<PlayerPage>;
 }

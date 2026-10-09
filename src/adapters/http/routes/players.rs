@@ -1,5 +1,8 @@
 use crate::{
-    adapters::http::{app_state::Shared, error::ApiError, json_body::JsonBody, response::blocking},
+    adapters::http::{
+        app_state::Shared, dto::player_query::parse_filter, error::ApiError, json_body::JsonBody,
+        response::blocking,
+    },
     utils::query::query_from_body,
 };
 use axum::{
@@ -33,7 +36,8 @@ async fn search_players(
     RawQuery(query): RawQuery,
 ) -> Result<Response, ApiError> {
     blocking(app, 200, move |app| {
-        app.players.search_players(&id, &query.unwrap_or_default())
+        app.players
+            .search_players(&id, &parse_filter(&query.unwrap_or_default())?)
     })
     .await
 }
@@ -44,7 +48,8 @@ async fn search_players_body(
     JsonBody(body): JsonBody<Value>,
 ) -> Result<Response, ApiError> {
     blocking(app, 200, move |app| {
-        app.players.search_players(&id, &query_from_body(&body))
+        app.players
+            .search_players(&id, &parse_filter(&query_from_body(&body))?)
     })
     .await
 }

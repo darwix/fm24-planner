@@ -5,35 +5,16 @@ pub mod records;
 use crate::{Error, Result};
 use archive::{check, Archive};
 use chrono::{Duration, NaiveDate};
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
-    sync::LazyLock,
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
 
-pub const PARSER_VERSION: &str = "fm24-rust-15-fm";
-#[derive(Deserialize, Serialize)]
-pub struct Attribute {
-    pub key: String,
-    pub label: String,
-    pub group: String,
-    pub index: usize,
-    pub scale: u8,
-    pub inverted: bool,
-}
-#[derive(Deserialize, Serialize)]
-pub struct Catalog {
-    pub attributes: Vec<Attribute>,
-    pub positions: Vec<String>,
-}
-pub static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../assets/attributes.json")).expect("attribute catalog")
-});
-
+pub const PARSER_VERSION: &str = "fm24-rust-16-fm";
+pub use crate::domain::catalog::{Attribute, Catalog, CATALOG};
 pub use crate::domain::entities::{ParsedSave, Player};
 fn date_of(year: u16, day: u16) -> Result<String> {
     // Match JavaScript's one-based day-of-year rollover for day 366.

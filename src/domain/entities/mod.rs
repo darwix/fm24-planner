@@ -1,7 +1,10 @@
 pub mod club;
 pub mod job;
+pub mod new_snapshot;
 pub mod parsed_save;
 pub mod player;
+pub mod player_filter;
+pub mod player_view;
 pub mod save_file;
 pub mod settings;
 pub mod snapshot_id;
@@ -9,8 +12,11 @@ pub mod source_file;
 
 pub use club::Club;
 pub use job::Job;
+pub use new_snapshot::{NewSnapshot, PlayerRecord};
 pub use parsed_save::ParsedSave;
 pub use player::Player;
+pub use player_filter::{ClubFilter, PlayerFilter, PositionFilter, Range, SortKey};
+pub use player_view::{PlayerDetail, PlayerPage, PlayerSummary};
 pub use save_file::SaveFile;
 pub use settings::Settings;
 pub use snapshot_id::SnapshotId;

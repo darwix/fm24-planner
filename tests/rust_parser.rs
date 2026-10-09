@@ -1,5 +1,8 @@
 mod support;
 use fm_savelens_backend::{
+    adapters::persistence::SqliteSnapshotRepository,
+    application::use_cases::{build_snapshot, ports::SnapshotRepository},
+    domain::entities::SnapshotId,
     parser::{archive::Archive, parse_save, CATALOG, PARSER_VERSION},
     storage,
 };
@@ -21,21 +24,25 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
     let source_mtime = fm_savelens_backend::utils::files::mtime(&stat).unwrap();
     let cancel = CancellationToken::new();
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
-    let dbpath = dir.path().join("snapshot.sqlite");
-    storage::create_snapshot(
-        &dbpath,
-        &save,
+    let snapshots = dir.path().join("snapshots");
+    fs::create_dir(&snapshots).unwrap();
+    let id = "b".repeat(64);
+    let repo = SqliteSnapshotRepository::new(snapshots.clone());
+    let snapshot = build_snapshot(
+        save,
         json!({
             "sourcePath": path,
             "sourceSize": stat.len(),
             "sourceMtime": source_mtime,
             "parserVersion": PARSER_VERSION,
         }),
-        &cancel,
     )
     .unwrap();
-    let db = storage::open_snapshot(&dbpath).unwrap();
-    let meta = storage::metadata(&db).unwrap();
+    repo.create("job", &snapshot, &cancel).unwrap();
+    repo.publish("job", &SnapshotId::parse(&id).unwrap())
+        .unwrap();
+    let saves = support::save_use_case(snapshots);
+    let meta = saves.snapshot(&id).unwrap();
     assert_eq!(meta["sourceMtime"].as_f64(), Some(source_mtime));
     assert_eq!(meta["stale"], false, "{meta}");
 
@@ -45,7 +52,7 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
     )
     .unwrap();
     assert_eq!(file.metadata().unwrap().len(), stat.len());
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
 }
 
 #[test]
@@ -80,26 +87,27 @@ fn compressed_and_plain_records_match_and_query_correctly() {
         assert_eq!(save.diagnostics["unbound"], 0);
         assert_eq!(fs::read(&path).unwrap(), before);
         let dbpath = dir.path().join(format!("{compressed}.sqlite"));
-        storage::create_snapshot(&dbpath, &save, json!({}), &cancel).unwrap();
+        variants.push(serde_json::to_value(&save.players).unwrap());
+        support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
         let db = storage::open_snapshot(&dbpath).unwrap();
-        let first = storage::search(
+        let first = support::search(
             &db,
             "q=alvaro&nation=12&position=12&attr_pace=13&caMin=200&paMax=199&limit=25",
         )
         .unwrap();
         assert_eq!(first["total"], 64);
         assert_eq!(first["players"].as_array().unwrap().len(), 25);
-        let second = storage::search(&db, "limit=25&page=2").unwrap();
+        let second = support::search(&db, "limit=25&page=2").unwrap();
         assert_ne!(first["players"][0]["id"], second["players"][0]["id"]);
-        assert_eq!(storage::search(&db, "q=%25").unwrap()["total"], 0);
-        assert_eq!(storage::search(&db, "club=-1").unwrap()["total"], 64);
+        assert_eq!(support::search(&db, "q=%25").unwrap()["total"], 0);
+        assert_eq!(support::search(&db, "club=-1").unwrap()["total"], 64);
         for field in ["age", "ca", "pa"] {
             assert_eq!(
-                storage::search(&db, &format!("{field}Min=250")).unwrap()["total"],
+                support::search(&db, &format!("{field}Min=250")).unwrap()["total"],
                 0
             );
             assert_eq!(
-                storage::search(&db, &format!("{field}Max=250")).unwrap()["total"],
+                support::search(&db, &format!("{field}Max=250")).unwrap()["total"],
                 64
             );
         }
@@ -113,10 +121,9 @@ fn compressed_and_plain_records_match_and_query_correctly() {
             "limit=0",
             "attr_pace=21",
         ] {
-            assert!(storage::search(&db, q).is_err(), "{q}");
+            assert!(support::search(&db, q).is_err(), "{q}");
         }
-        assert_eq!(storage::player(&db, 99999).unwrap_err().code, "NOT_FOUND");
-        variants.push(serde_json::to_value(&save.players).unwrap());
+        assert!(storage::player(&db, 99999).unwrap().is_none());
     }
     assert_eq!(variants[0], variants[1]);
 }
@@ -149,7 +156,10 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
         serde_json::from_str::<Value>(&encoded).unwrap()["sourceMtime"].as_f64(),
         Some(original)
     );
-    let dbpath = dir.path().join("legacy.sqlite");
+    let snapshots = dir.path().join("snapshots");
+    fs::create_dir(&snapshots).unwrap();
+    let id = "c".repeat(64);
+    let dbpath = snapshots.join(format!("{id}.sqlite"));
     {
         let db = Connection::open(&dbpath).unwrap();
         db.execute_batch("CREATE TABLE metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL)")
@@ -157,22 +167,22 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
         db.execute("INSERT INTO metadata VALUES ('snapshot',?)", [&encoded])
             .unwrap();
     }
-    let db = storage::open_snapshot(&dbpath).unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], false);
+    let saves = support::save_use_case(snapshots);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
     file.set_times(fs::FileTimes::new().set_modified(stamp + Duration::from_secs(1)))
         .unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
     file.set_times(fs::FileTimes::new().set_modified(stamp))
         .unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
     file.set_len(stat.len() + 1).unwrap();
     file.set_times(fs::FileTimes::new().set_modified(stamp))
         .unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
     file.set_len(stat.len()).unwrap();
     file.set_times(fs::FileTimes::new().set_modified(stamp))
         .unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
     let mut incompatible = metadata;
     incompatible["parserVersion"] = json!("old-parser");
     let writer = Connection::open(&dbpath).unwrap();
@@ -182,7 +192,7 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
             [incompatible.to_string()],
         )
         .unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
     writer
         .execute(
             "UPDATE metadata SET value=? WHERE key='snapshot'",
@@ -190,10 +200,10 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
         )
         .unwrap();
     drop(writer);
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
     drop(file);
     fs::remove_file(&path).unwrap();
-    assert_eq!(storage::metadata(&db).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
 }
 #[test]
 fn malformed_and_unsupported_archives_are_rejected() {
@@ -245,14 +255,14 @@ fn foreign_ability_ownership_is_excluded_and_sorting_is_directional() {
     assert!(!save.players.iter().any(|p| p.id == 1));
     assert_eq!(save.players.iter().find(|p| p.id == 2).unwrap().ca, 100);
     let dbpath = dir.path().join("snapshot.sqlite");
-    storage::create_snapshot(&dbpath, &save, json!({}), &cancel).unwrap();
+    support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
     let db = storage::open_snapshot(&dbpath).unwrap();
     assert_eq!(
-        storage::search(&db, "sort=ca&direction=asc").unwrap()["players"][0]["id"],
+        support::search(&db, "sort=ca&direction=asc").unwrap()["players"][0]["id"],
         2
     );
     assert_ne!(
-        storage::search(&db, "sort=ca&direction=desc").unwrap()["players"][0]["id"],
+        support::search(&db, "sort=ca&direction=desc").unwrap()["players"][0]["id"],
         2
     );
 }

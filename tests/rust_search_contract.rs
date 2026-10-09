@@ -11,7 +11,7 @@ fn search_filters_contract_end_and_value_in_sql() {
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let dbpath = dir.path().join("s.sqlite");
-    storage::create_snapshot(&dbpath, &save, json!({}), &cancel).unwrap();
+    support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
     rusqlite::Connection::open(&dbpath)
         .unwrap()
         .execute_batch(
@@ -22,14 +22,14 @@ fn search_filters_contract_end_and_value_in_sql() {
         )
         .unwrap();
     let db = storage::open_snapshot(&dbpath).unwrap();
-    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     // inclusive cutoff; players without a contract never match
     assert_eq!(total("contractEndMax=2053-06-30"), 1);
     assert_eq!(total("contractEndMax=2053-07-01"), 2);
     assert_eq!(total("valueMax=4000000"), 2);
     assert_eq!(total("valueMax=4000000&contractEndMax=2053-07-01"), 1);
-    assert!(storage::search(&db, "contractEndMax=soon").is_err());
-    assert!(storage::search(&db, "valueMax=-1").is_err());
+    assert!(support::search(&db, "contractEndMax=soon").is_err());
+    assert!(support::search(&db, "valueMax=-1").is_err());
 }
 
 fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
@@ -38,7 +38,7 @@ fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let dbpath = dir.path().join("t.sqlite");
-    storage::create_snapshot(&dbpath, &save, json!({}), &cancel).unwrap();
+    support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
     dbpath
 }
 
@@ -46,12 +46,12 @@ fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
 fn main_position_is_the_best_rated_position() {
     let dir = tempfile::tempdir().unwrap();
     let db = storage::open_snapshot(&snapshot(&dir)).unwrap();
-    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     // every fixture player is a striker (position 12)
     assert_eq!(total("mainPosition=12"), 64);
     assert_eq!(total("mainPosition=3"), 0);
     assert_eq!(total("mainPosition=3,12"), 64);
-    assert!(storage::search(&db, "mainPosition=99").is_err());
+    assert!(support::search(&db, "mainPosition=99").is_err());
 }
 
 #[test]
@@ -65,12 +65,12 @@ fn unknown_value_and_excluded_ids() {
         )
         .unwrap();
     let db = storage::open_snapshot(&dbpath).unwrap();
-    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=1000000"), 62);
     assert_eq!(total("valueMax=1000000&valueUnknown=1"), 64);
     assert_eq!(total("excludeIds=1,2,3"), 61);
     assert_eq!(total("excludeIds="), 64);
-    assert!(storage::search(&db, "excludeIds=1,x").is_err());
+    assert!(support::search(&db, "excludeIds=1,x").is_err());
 }
 
 #[test]
@@ -93,7 +93,7 @@ fn zero_value_in_the_save_is_stored_as_unknown() {
     let dir = tempfile::tempdir().unwrap();
     let db = storage::open_snapshot(&snapshot(&dir)).unwrap();
     // fixture players carry a value of 0, which must not count as cheap
-    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=5000000"), 0);
     assert_eq!(total("valueMax=5000000&valueUnknown=1"), 64);
 }
@@ -110,7 +110,7 @@ fn no_contract_keeps_only_players_without_a_contract_end() {
         )
         .unwrap();
     let db = storage::open_snapshot(&dbpath).unwrap();
-    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("noContract=1"), 63);
     assert_eq!(total(""), 64);
 }

@@ -45,6 +45,18 @@ describe("toPool", () => {
       left: 40,
     });
   });
+  it("treats a player with no club and no contract as expired", () => {
+    const p = toPool(
+      { ...api, club: null, contractEnd: null, wage: null, value: null },
+      "2053-02-18",
+    );
+    expect(p.left).toBe(0);
+  });
+  it("keeps a clubbed player with no contract unknown", () => {
+    expect(
+      toPool({ ...api, contractEnd: null }, "2053-02-18").left,
+    ).toBeUndefined();
+  });
   it("uses the first position as the backend names it", () => {
     expect(toPool({ ...api, positions: ["AMC"] }, "2053-02-18").p).toBe("AMC");
   });

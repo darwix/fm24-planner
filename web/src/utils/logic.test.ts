@@ -51,4 +51,7 @@ describe("contractLabel", () => {
     expect(contractLabel(7, 2053)).toBe("7 months left");
     expect(contractLabel(31, 2055)).toBe("to 2055");
   });
+  it("says Expired at zero months", () => {
+    expect(contractLabel(0, undefined)).toBe("Expired");
+  });
 });

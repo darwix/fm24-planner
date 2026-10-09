@@ -19,28 +19,44 @@ use std::{
     time::Duration,
 };
 
-/// Columns before the per-attribute ones, in insert order.
-const PLAYER_COLUMNS: [&str; 19] = [
-    "id",
-    "uid",
-    "name",
-    "full_name",
-    "search_name",
-    "age",
-    "club_id",
-    "club",
-    "nation_id",
-    "nations",
-    "nationalities",
-    "positions",
-    "position_mask",
-    "main_position",
-    "ca",
-    "pa",
-    "wage",
-    "contract_end",
-    "value",
+/// Columns before the per-attribute ones, in insert order, with their SQL types.
+/// The attribute columns and `detail` follow; see [`player_columns`].
+const PLAYER_COLUMNS: [(&str, &str); 19] = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("uid", "INTEGER NOT NULL"),
+    ("name", "TEXT NOT NULL"),
+    ("full_name", "TEXT NOT NULL"),
+    ("search_name", "TEXT NOT NULL"),
+    ("age", "INTEGER"),
+    ("club_id", "INTEGER"),
+    ("club", "TEXT"),
+    ("nation_id", "INTEGER"),
+    ("nations", "TEXT NOT NULL"),
+    ("nationalities", "TEXT NOT NULL"),
+    ("positions", "TEXT NOT NULL"),
+    ("position_mask", "INTEGER NOT NULL"),
+    ("main_position", "INTEGER NOT NULL"),
+    ("ca", "INTEGER"),
+    ("pa", "INTEGER"),
+    ("wage", "INTEGER"),
+    ("contract_end", "TEXT"),
+    ("value", "INTEGER"),
 ];
+
+/// Every column of the players table as `name TYPE`, in insert order.
+fn player_columns() -> Vec<String> {
+    let fixed = PLAYER_COLUMNS
+        .iter()
+        .map(|(name, ty)| format!("{name} {ty}"));
+    let attributes = CATALOG
+        .attributes
+        .iter()
+        .map(|a| format!("attr_{} INTEGER", a.key));
+    fixed
+        .chain(attributes)
+        .chain(["detail TEXT NOT NULL".to_owned()])
+        .collect()
+}
 const INDEXES: &str = "CREATE INDEX idx_players_pa ON players(pa DESC,ca DESC,id); CREATE INDEX idx_players_ca ON players(ca); CREATE INDEX idx_players_age ON players(age); CREATE INDEX idx_players_club ON players(club_id); CREATE INDEX idx_players_nation ON players(nation_id); PRAGMA optimize;";
 
 fn optional<T: Into<SqlValue>>(value: Option<T>) -> SqlValue {
@@ -49,21 +65,16 @@ fn optional<T: Into<SqlValue>>(value: Option<T>) -> SqlValue {
 
 pub fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag) -> Result<()> {
     let mut db: Connection = Connection::open(path)?;
-    let attributes: String = CATALOG
-        .attributes
-        .iter()
-        .map(|a| format!(",attr_{} INTEGER", a.key))
-        .collect();
-    db.execute_batch(&format!("CREATE TABLE metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE players (
-        id INTEGER PRIMARY KEY,uid INTEGER NOT NULL,name TEXT NOT NULL,full_name TEXT NOT NULL,search_name TEXT NOT NULL,
-        age INTEGER,club_id INTEGER,club TEXT,nation_id INTEGER,nations TEXT NOT NULL,nationalities TEXT NOT NULL,positions TEXT NOT NULL,position_mask INTEGER NOT NULL,main_position INTEGER NOT NULL,
-        ca INTEGER,pa INTEGER,wage INTEGER,contract_end TEXT,value INTEGER{attributes},detail TEXT NOT NULL);"))?;
+    let columns = player_columns();
+    db.execute_batch(&format!(
+        "CREATE TABLE metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL); CREATE TABLE players ({});",
+        columns.join(",")
+    ))?;
     let tx = db.transaction()?;
     {
-        let columns = PLAYER_COLUMNS.len() + CATALOG.attributes.len() + 1;
         let mut insert = tx.prepare(&format!(
             "INSERT INTO players VALUES ({})",
-            vec!["?"; columns].join(",")
+            vec!["?"; columns.len()].join(",")
         ))?;
         for p in &snapshot.players {
             check(cancel)?;

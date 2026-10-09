@@ -34,6 +34,16 @@ describe("matchFilter", () => {
   });
 });
 
+describe("unknown contract data", () => {
+  const f = { pos: "", min: 16, max: 40, exp: false, val: "" as const };
+  it("is never expiring and never cheap", () => {
+    expect(matchFilter({ p: "ST", a: 20 }, { ...f, exp: true })).toBe(false);
+    expect(matchFilter({ p: "ST", a: 20 }, { ...f, val: 5 })).toBe(false);
+    expect(matchFilter({ p: "ST", a: 20 }, f)).toBe(true);
+    expect(asCandidate({ ca: 100, pa: 100 }).tags).toEqual([]);
+  });
+});
+
 describe("asCandidate", () => {
   it("tags expiring (<=12m) and cheap (<=5M) players", () => {
     const c = asCandidate({ ca: 100, pa: 100, left: 12, v: 5 });

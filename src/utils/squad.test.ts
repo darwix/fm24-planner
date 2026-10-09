@@ -9,6 +9,11 @@ const pl = (name: string, positions: string[], ca: number) => ({
   ca,
   pa: ca + 5,
   age: 25,
+  club: "Test FC",
+  nationalities: ["England"],
+  wage: null,
+  contractEnd: null,
+  value: null,
 });
 
 describe("buildSquad", () => {
@@ -19,6 +24,24 @@ describe("buildSquad", () => {
       pl("C", ["ST"], 130),
     ]);
     expect(s.filter((x) => x.xi).map((x) => x.n)).toEqual(["B", "C"]);
+  });
+  it("fills the AM slot from the backend's AMC", () => {
+    const s = buildSquad([pl("A", ["AMC"], 150)]);
+    expect(s[0]).toMatchObject({ p: "AM", xi: 1 });
+  });
+  it("carries contract, value and wage from the save", () => {
+    const [x] = buildSquad(
+      [
+        {
+          ...pl("A", ["ST"], 150),
+          wage: 455_280,
+          contractEnd: "2056-06-30",
+          value: 96_391_200,
+        },
+      ],
+      "2053-02-18",
+    );
+    expect(x).toMatchObject({ c: 2056, left: 39, v: 96.4, w: 455 });
   });
   it("uses a player once only", () => {
     const s = buildSquad([pl("A", ["DM", "AM"], 150)]);

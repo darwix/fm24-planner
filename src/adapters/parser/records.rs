@@ -530,6 +530,9 @@ pub fn teams(
                 .or_else(|| by_name(parent));
         } else if club_map.get(&h.owner).is_some_and(|c| c.uid == h.uid) {
             club = Some(h.owner);
+        } else if h.typed && h.owner <= 256 && [20, 23].contains(&h.flag) {
+            // youth team of a big club: small owner ids collide with clubs, so only the flag says owner - 1
+            club = Some(h.owner.wrapping_sub(1)).filter(|id| club_map.contains_key(id));
         } else if h.typed && !(h.kind == 100 && h.flag & 32 != 0) && h.owner > 256 {
             let id = if [20, 23].contains(&h.kind) {
                 h.owner - 1

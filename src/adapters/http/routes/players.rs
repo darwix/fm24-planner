@@ -12,16 +12,22 @@ use serde_json::Value;
 
 pub fn routes() -> Router<Shared> {
     Router::new()
-        .route("/api/snapshots/{id}", get(snapshot))
-        .route("/api/snapshots/{id}/players", get(search))
-        .route("/api/snapshots/{id}/players/search", post(search_body))
-        .route("/api/snapshots/{id}/players/{player}", get(player))
+        .route("/api/snapshots/{id}", get(get_snapshot))
+        .route("/api/snapshots/{id}/players", get(search_players))
+        .route(
+            "/api/snapshots/{id}/players/search",
+            post(search_players_body),
+        )
+        .route("/api/snapshots/{id}/players/{player}", get(get_player))
 }
 
-async fn snapshot(State(app): State<Shared>, Path(id): Path<String>) -> Result<Response, ApiError> {
+async fn get_snapshot(
+    State(app): State<Shared>,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     blocking(app, 200, move |app| app.players.snapshot(&id)).await
 }
-async fn search(
+async fn search_players(
     State(app): State<Shared>,
     Path(id): Path<String>,
     RawQuery(query): RawQuery,
@@ -32,7 +38,7 @@ async fn search(
     .await
 }
 /// Same filters as the GET query string, sent as JSON to avoid URL length limits.
-async fn search_body(
+async fn search_players_body(
     State(app): State<Shared>,
     Path(id): Path<String>,
     JsonBody(body): JsonBody<Value>,
@@ -42,7 +48,7 @@ async fn search_body(
     })
     .await
 }
-async fn player(
+async fn get_player(
     State(app): State<Shared>,
     Path((id, player)): Path<(String, String)>,
 ) -> Result<Response, ApiError> {

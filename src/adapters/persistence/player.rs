@@ -1,10 +1,20 @@
-use super::nation_name;
-use crate::utils::text::normalize;
-use crate::{parser::CATALOG, Error, Result};
+use super::{nation_name, snapshot::open_snapshot};
+use crate::{
+    application::use_cases::ports::PlayerRepository, parser::CATALOG, utils::text::normalize,
+    Error, Result,
+};
 use rusqlite::{params_from_iter, types::Value as SqlValue, Connection};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
+pub fn player(db: &Connection, id: u32) -> Result<Value> {
+    use rusqlite::OptionalExtension;
+    let raw: Option<String> = db
+        .query_row("SELECT detail FROM players WHERE id=?", [id], |r| r.get(0))
+        .optional()?;
+    let raw = raw.ok_or_else(|| Error::new("NOT_FOUND", "Player not found."))?;
+    Ok(serde_json::from_str(&raw)?)
+}
 pub fn search(db: &Connection, query: &str) -> Result<Value> {
     let mut params = HashMap::new();
     for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
@@ -218,4 +228,16 @@ pub fn search(db: &Connection, query: &str) -> Result<Value> {
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;
     Ok(json!({"total":total,"page":page,"limit":limit,"players":players}))
+}
+
+/// Player queries on a snapshot file.
+pub struct SqlitePlayerRepository;
+
+impl PlayerRepository for SqlitePlayerRepository {
+    fn player(&self, path: &Path, id: u32) -> Result<Value> {
+        player(&open_snapshot(path)?, id)
+    }
+    fn search(&self, path: &Path, query: &str) -> Result<Value> {
+        search(&open_snapshot(path)?, query)
+    }
 }

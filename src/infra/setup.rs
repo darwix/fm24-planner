@@ -2,7 +2,7 @@ use crate::{
     adapters::{
         http::app_state::{AppState, Shared},
         parser::reader::FmSaveReader,
-        persistence::snapshot_store::SqliteSnapshots,
+        persistence::{SqlitePlayerRepository, SqliteSnapshotRepository},
     },
     application::{use_cases::wait_for, Workspace},
     infra::{
@@ -47,7 +47,8 @@ pub async fn start(port: u16, data: &Path) -> Result<RunningServer> {
     let workspace = Workspace::open(
         data,
         Arc::new(FmSaveReader),
-        Arc::new(SqliteSnapshots),
+        Arc::new(SqliteSnapshotRepository),
+        Arc::new(SqlitePlayerRepository),
         default_folder(),
     )?;
     let app = AppState::new(workspace);

@@ -1,10 +1,7 @@
 mod countries;
-mod read;
-mod search;
-pub mod snapshot_store;
-mod write;
+pub mod player;
+pub mod snapshot;
 
 pub use countries::nation_name;
-pub use read::{metadata, open_snapshot, player};
-pub use search::search;
-pub use write::create_snapshot;
+pub use player::{player, search, SqlitePlayerRepository};
+pub use snapshot::{create_snapshot, metadata, open_snapshot, SqliteSnapshotRepository};

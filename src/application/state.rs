@@ -1,5 +1,5 @@
 use crate::{
-    application::use_cases::ports::{SaveReader, SnapshotStore},
+    application::use_cases::ports::{PlayerRepository, SaveReader, SnapshotRepository},
     domain::entities::{Job, Settings},
     utils::files::canonical,
     Error, Result,
@@ -28,19 +28,21 @@ pub(crate) struct Inner {
     pub active: Option<Active>,
     pub shutting_down: bool,
 }
-/// Runtime state shared by the use cases: settings, import jobs and the two ports.
+/// Runtime state shared by the use cases: settings, import jobs and the ports.
 pub struct Workspace {
     pub(crate) data: PathBuf,
     pub(crate) inner: Mutex<Inner>,
     pub(crate) reader: Arc<dyn SaveReader>,
-    pub(crate) store: Arc<dyn SnapshotStore>,
+    pub(crate) snapshots: Arc<dyn SnapshotRepository>,
+    pub(crate) players: Arc<dyn PlayerRepository>,
     _lock: File,
 }
 impl Workspace {
     pub fn open(
         data: &Path,
         reader: Arc<dyn SaveReader>,
-        store: Arc<dyn SnapshotStore>,
+        snapshots: Arc<dyn SnapshotRepository>,
+        players: Arc<dyn PlayerRepository>,
         default_folder: String,
     ) -> Result<Arc<Self>> {
         fs::create_dir_all(data)?;
@@ -90,7 +92,8 @@ impl Workspace {
                 shutting_down: false,
             }),
             reader,
-            store,
+            snapshots,
+            players,
             _lock: lock,
         });
         app.persist(&app.inner.lock().unwrap().settings)?;

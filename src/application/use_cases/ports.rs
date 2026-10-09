@@ -15,8 +15,8 @@ pub trait SaveReader: Send + Sync {
     ) -> Result<ParsedSave>;
 }
 
-/// Stores imported saves as snapshots and answers queries on them.
-pub trait SnapshotStore: Send + Sync {
+/// Stores imported saves as snapshot files.
+pub trait SnapshotRepository: Send + Sync {
     fn create(
         &self,
         path: &Path,
@@ -25,6 +25,10 @@ pub trait SnapshotStore: Send + Sync {
         cancel: &CancellationToken,
     ) -> Result<()>;
     fn metadata(&self, path: &Path) -> Result<Value>;
+}
+
+/// Reads players from an imported snapshot.
+pub trait PlayerRepository: Send + Sync {
     fn player(&self, path: &Path, id: u32) -> Result<Value>;
     fn search(&self, path: &Path, query: &str) -> Result<Value>;
 }

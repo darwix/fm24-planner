@@ -1,11 +1,12 @@
 use super::nation_name;
-use crate::utils::text::normalize;
 use crate::{
-    parser::{archive::check, ParsedSave, CATALOG},
+    application::use_cases::ports::SnapshotRepository,
+    parser::{archive::check, ParsedSave, CATALOG, PARSER_VERSION},
+    utils::text::normalize,
     Error, Result,
 };
 use chrono::Utc;
-use rusqlite::{params_from_iter, types::Value as SqlValue, Connection};
+use rusqlite::{params_from_iter, types::Value as SqlValue, Connection, OpenFlags};
 use serde_json::{json, Value};
 use std::{collections::BTreeSet, path::Path};
 use tokio_util::sync::CancellationToken;
@@ -16,8 +17,8 @@ pub fn create_snapshot(
     mut meta: Value,
     cancel: &CancellationToken,
 ) -> Result<()> {
-    let mut db = Connection::open(path)?;
-    let attributes = CATALOG
+    let mut db: Connection = Connection::open(path)?;
+    let attributes: String = CATALOG
         .attributes
         .iter()
         .map(|a| format!("attr_{} INTEGER", a.key))
@@ -139,4 +140,42 @@ pub fn create_snapshot(
         Ok(())
     })?;
     Ok(())
+}
+pub fn open_snapshot(path: &Path) -> Result<Connection> {
+    Ok(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?)
+}
+pub fn metadata(db: &Connection) -> Result<Value> {
+    let raw: String = db.query_row("SELECT value FROM metadata WHERE key='snapshot'", [], |r| {
+        r.get(0)
+    })?;
+    let mut m: Value = serde_json::from_str(&raw)?;
+    m["stale"] = json!(
+        std::fs::metadata(m["sourcePath"].as_str().unwrap_or("")).map_or(true, |s| {
+            s.len() != m["sourceSize"].as_u64().unwrap_or(0)
+                || crate::utils::files::mtime(&s).ok() != m["sourceMtime"].as_f64()
+                || m["parserVersion"].as_str() != Some(PARSER_VERSION)
+        })
+    );
+    Ok(m)
+}
+
+/// One SQLite file per imported save.
+pub struct SqliteSnapshotRepository;
+
+impl SnapshotRepository for SqliteSnapshotRepository {
+    fn create(
+        &self,
+        path: &Path,
+        save: &ParsedSave,
+        meta: Value,
+        cancel: &CancellationToken,
+    ) -> Result<()> {
+        create_snapshot(path, save, meta, cancel)
+    }
+    fn metadata(&self, path: &Path) -> Result<Value> {
+        metadata(&open_snapshot(path)?)
+    }
 }

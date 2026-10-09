@@ -11,19 +11,25 @@ use axum::{
 
 pub fn routes() -> Router<Shared> {
     Router::new()
-        .route("/api/imports", post(start))
-        .route("/api/imports/{id}", get(job).delete(cancel))
+        .route("/api/imports", post(start_import))
+        .route("/api/imports/{id}", get(get_import).delete(cancel_import))
 }
 
-async fn start(
+async fn start_import(
     State(app): State<Shared>,
     JsonBody(body): JsonBody<ImportBody>,
 ) -> Result<Response, ApiError> {
     blocking(app, 202, move |app| app.saves.start_import(&body.save_id)).await
 }
-async fn job(State(app): State<Shared>, Path(id): Path<String>) -> Result<Response, ApiError> {
+async fn get_import(
+    State(app): State<Shared>,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     blocking(app, 200, move |app| app.saves.job(&id)).await
 }
-async fn cancel(State(app): State<Shared>, Path(id): Path<String>) -> Result<Response, ApiError> {
+async fn cancel_import(
+    State(app): State<Shared>,
+    Path(id): Path<String>,
+) -> Result<Response, ApiError> {
     blocking(app, 200, move |app| app.saves.cancel(&id)).await
 }

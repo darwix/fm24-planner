@@ -113,7 +113,7 @@ impl SaveUseCase {
                         job.message = message.into();
                     }
                 })?;
-                self.ws.store.create(
+                self.ws.snapshots.create(
                     &temporary,
                     &parsed,
                     json!({"snapshotId":save.snapshot_id,"sourcePath":file,"sourceName":save.name,"sourceSize":save.size,"sourceMtime":save.mtime,"parserVersion":self.ws.reader.version()}),

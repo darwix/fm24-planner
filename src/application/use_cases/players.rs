@@ -24,15 +24,15 @@ impl PlayerUseCase {
         Ok(path)
     }
     pub fn snapshot(&self, id: &str) -> Result<Value> {
-        self.ws.store.metadata(&self.snapshot_path(id)?)
+        self.ws.snapshots.metadata(&self.snapshot_path(id)?)
     }
     pub fn search_players(&self, id: &str, query: &str) -> Result<Value> {
-        self.ws.store.search(&self.snapshot_path(id)?, query)
+        self.ws.players.search(&self.snapshot_path(id)?, query)
     }
     pub fn player(&self, id: &str, player: &str) -> Result<Value> {
         let player = player
             .parse()
             .map_err(|_| Error::new("NOT_FOUND", "Player not found."))?;
-        self.ws.store.player(&self.snapshot_path(id)?, player)
+        self.ws.players.player(&self.snapshot_path(id)?, player)
     }
 }

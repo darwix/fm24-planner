@@ -1,3 +1,4 @@
+//! How names are compared in search: accents removed, lowercase.
 use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
 pub fn normalize(s: &str) -> String {

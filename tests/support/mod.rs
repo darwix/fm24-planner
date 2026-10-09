@@ -128,10 +128,9 @@ pub fn create_snapshot(
     meta: fm_savelens_backend::domain::entities::SnapshotMeta,
     cancel: &fm_savelens_backend::utils::cancel::CancelFlag,
 ) -> fm_savelens_backend::Result<()> {
-    use fm_savelens_backend::application::use_cases::build_snapshot;
     fm_savelens_backend::adapters::persistence::snapshot::create_snapshot(
         path,
-        &build_snapshot(save, meta),
+        &fm_savelens_backend::domain::entities::NewSnapshot::from_parsed(save, meta),
         cancel,
     )
 }

@@ -23,6 +23,7 @@ src/
 ├── domain/                 what the app is about, no I/O
 │   ├── entities/           Player, ParsedSave, Job, Settings, SnapshotId, PlayerFilter, ...
 │   ├── catalog.rs          attributes and positions every player is rated on
+│   ├── text.rs             how names are compared in search
 │   └── countries.rs        nation id to name
 ├── application/            what the app does
 │   ├── session.rs          in-memory state: settings, import jobs, shutdown flag
@@ -31,8 +32,7 @@ src/
 │       ├── saves.rs        SaveUseCase: list saves, snapshot metadata
 │       ├── imports.rs      SaveUseCase: start, run, cancel an import
 │       ├── players.rs      PlayerUseCase: search and read players
-│       ├── settings.rs     SettingsUseCase: save folder
-│       └── snapshot_builder.rs   derived columns and metadata of a snapshot
+│       └── settings.rs     SettingsUseCase: save folder
 ├── adapters/
 │   ├── http/               axum: routes, dto, error mapping, AppState
 │   ├── persistence/        SQLite snapshots, JSON settings, files on disk, rusqlite/serde_json errors
@@ -42,7 +42,7 @@ src/
 │   ├── app.rs              router with the host and origin guard
 │   ├── data_dir.rs         data directory, instance lock, leftover cleanup
 │   └── config.rs           command-line arguments and defaults
-├── utils/                  helpers used by more than one layer: cancel (CancelFlag), files, text
+├── utils/                  helpers used by more than one layer: cancel (CancelFlag), files
 └── assets/                 JSON catalogs (attributes, nations) embedded by domain
 ```
 
@@ -56,7 +56,8 @@ Plain data and the rules that belong to it, with no framework or I/O.
 - `Player`, `ParsedSave`, `Club`: what the parser reads from a save.
 - `PlayerFilter`: a validated search, with `Range`, `ClubFilter`, `PositionFilter`, `SortKey`.
 - `PlayerSummary`, `PlayerPage`, `PlayerDetail`: what a search or a player page returns.
-- `NewSnapshot`, `PlayerRecord`: an import ready to store, every derived value worked out.
+- `NewSnapshot`, `PlayerRecord`: an import ready to store; `NewSnapshot::from_parsed` works out
+  every derived value.
 - `SnapshotId`: a 64-character hex digest, validated once when parsed.
 - `SnapshotMeta`: the summary stored with a snapshot (source file, game date, nations, clubs).
 - `Job`, `Settings`, `SaveFile`, `SourceFile`.

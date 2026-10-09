@@ -1,9 +1,9 @@
 use crate::{
+    domain::text::normalize,
     domain::{
         catalog::CATALOG,
         entities::{ClubFilter, PlayerFilter, PositionFilter, Range, SortKey},
     },
-    utils::text::normalize,
     Error, Result,
 };
 use serde_json::Value;

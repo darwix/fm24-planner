@@ -2,9 +2,9 @@ use crate::utils::cancel::CancelFlag;
 use crate::{
     application::{
         session::{Active, Completion, Inner},
-        use_cases::{snapshot_builder::build_snapshot, SaveUseCase},
+        use_cases::SaveUseCase,
     },
-    domain::entities::{Job, JobStatus, SaveFile, SnapshotId, SnapshotMeta},
+    domain::entities::{Job, JobStatus, NewSnapshot, SaveFile, SnapshotId, SnapshotMeta},
     utils::cancel::check,
     Error, Result,
 };
@@ -130,7 +130,7 @@ impl SaveUseCase {
                 }
             })?;
         let players = parsed.players.len();
-        let snapshot = build_snapshot(
+        let snapshot = NewSnapshot::from_parsed(
             parsed,
             SnapshotMeta {
                 snapshot_id: save.snapshot_id.clone(),
@@ -139,6 +139,7 @@ impl SaveUseCase {
                 source_size: save.size,
                 source_mtime: save.mtime,
                 parser_version: self.reader.version().to_owned(),
+                imported_at: now(),
                 ..Default::default()
             },
         );
@@ -239,7 +240,7 @@ fn new_job(id: String, save: &SaveFile) -> Job {
         status,
         progress,
         message: message.into(),
-        started_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        started_at: now(),
         player_count: None,
         elapsed_ms: None,
     }
@@ -262,4 +263,9 @@ pub fn wait_for(completion: &Completion) {
     while !*complete {
         complete = done.wait(complete).unwrap();
     }
+}
+
+/// The current time as RFC 3339 with milliseconds, as jobs and snapshots store it.
+fn now() -> String {
+    Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }

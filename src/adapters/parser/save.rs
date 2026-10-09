@@ -8,15 +8,16 @@
 //! abilities CA, PA, team, positions and attributes
 //! link      pair each person with the one ability block before it
 //! clubs     club records
-//! teams     team heads and rosters, each team's club
-//! players   club, attributes, contract and value for each pair
-//! fallback  club by contract votes for teams no record places
+//! teams     team heads and rosters; each player's club (team record, roster, contract votes)
+//! players   contract, attributes and value for each pair
 //! checks    managed club, no players, duplicate ids, file changed while reading
 //! ```
 use super::{
     abilities::{self, Ability},
     archive::{check, Archive},
-    bytes, clubs, contract, names,
+    bytes, clubs, contract,
+    contract::Contract,
+    names,
     people::{self, Person},
     teams::{self, Team},
 };
@@ -51,7 +52,7 @@ pub fn parse_save(
     progress(2, "Reading save index");
     let (mut archive, version) = open_supported(path, cancel)?;
     progress(10, "Reading player database");
-    let db = archive.member("game_db.dat", cancel)?;
+    let db: Vec<u8> = archive.member("game_db.dat", cancel)?;
     let (year, game_date) = game_date(&db)?;
     progress(23, "Resolving player names");
     let pools = names::find(&db, cancel)?;
@@ -63,21 +64,32 @@ pub fn parse_save(
     progress(68, "Resolving clubs and squads");
     let clubs = clubs::find(&db, pools.start, cancel)?;
     let teams = teams::find(&db, &clubs, pools.start, &person_ids(&people), cancel)?;
-    let club_map: HashMap<_, _> = clubs.iter().map(|c| (c.id, c)).collect();
-    let squads = squads(&teams);
-    let team_map: HashMap<_, _> = teams.iter().map(|t| (t.ordinal + 1, t)).collect();
-    let mut players = vec![];
-    for &(person, ability) in &linked.pairs {
+    let mut contracts = vec![];
+    for &(person, _) in &linked.pairs {
         check(cancel)?;
-        let club_id = team_map
-            .get(&ability.team)
-            .and_then(|t| t.club)
-            .or_else(|| squads.get(&(person.id as u32)).copied());
-        players.push(to_player(
-            &db, person, ability, club_id, &club_map, year, &game_date,
-        )?);
+        let window = &db[person.offset.saturating_sub(CONTRACT_WINDOW)..person.offset];
+        contracts.push(contract::find(window, person.id as u32));
     }
-    assign_clubs_by_contract(&mut players, &club_map);
+    let rows: Vec<_> = linked
+        .pairs
+        .iter()
+        .zip(&contracts)
+        .map(|(&(person, ability), contract)| (person.id as u32, ability.team, contract.team))
+        .collect();
+    let club_map: HashMap<_, _> = clubs.iter().map(|c| (c.id, c)).collect();
+    let club_ids = teams::player_clubs(&teams, &rows, &club_map.keys().copied().collect());
+    let players = linked
+        .pairs
+        .iter()
+        .zip(contracts)
+        .zip(club_ids)
+        .map(|((&(person, ability), contract), club_id)| {
+            let club = club_id.and_then(|id| club_map.get(&id).map(|c| c.short_name.clone()));
+            to_player(
+                &db, person, ability, contract, club_id, club, year, &game_date,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
     let managed_club_id = managed_club(&mut archive, &clubs, &players, cancel);
     validate(&players, &archive)?;
     progress(88, "Preparing search index");
@@ -89,7 +101,7 @@ pub fn parse_save(
         format_version: version,
         game_date,
         warnings: warnings(&linked),
-        players: players.into_iter().map(|p| p.player).collect(),
+        players,
         clubs,
         managed_club_id,
         diagnostics,
@@ -181,43 +193,21 @@ fn person_ids(people: &[Person]) -> HashSet<u32> {
         .collect()
 }
 
-/// Person id to club, from the rosters of teams that have a club. A first team (kind 100)
-/// wins over reserve and youth teams.
-fn squads(teams: &[Team]) -> HashMap<u32, u32> {
-    let mut squads = HashMap::new();
-    for team in teams {
-        let Some(club) = team.club else { continue };
-        for &id in &team.members {
-            if team.kind == 100 || !squads.contains_key(&id) {
-                squads.insert(id, club);
-            }
-        }
-    }
-    squads
-}
-
-/// A player with what the club fallback needs: its ability team and the team its contract names.
-struct Parsed {
-    player: Player,
-    team: u32,
-    contract_team: Option<u32>,
-}
-
+#[allow(clippy::too_many_arguments)]
 fn to_player(
     db: &[u8],
     person: &Person,
     ability: &Ability,
+    contract: Contract,
     club_id: Option<u32>,
-    club_map: &HashMap<u32, &Club>,
+    club: Option<String>,
     year: u16,
     game_date: &str,
-) -> Result<Parsed> {
+) -> Result<Player> {
     let mut raw = ability.raw.clone();
     raw.extend_from_slice(&person.personality);
-    let window = &db[person.offset.saturating_sub(CONTRACT_WINDOW)..person.offset];
-    let contract = contract::find(window, person.id as u32);
     let birth_date = date_of(person.birth_year, person.birth_day)?;
-    let player = Player {
+    Ok(Player {
         id: person.id as u32,
         uid: person.uid,
         name: person.name.clone(),
@@ -227,7 +217,7 @@ fn to_player(
         nation_id: person.nation,
         other_nation_ids: person.other_nations.clone(),
         club_id,
-        club: club_name(club_map, club_id),
+        club,
         ca: ability.ca,
         pa: ability.pa,
         positions: positions(&ability.positions),
@@ -242,11 +232,6 @@ fn to_player(
             "ability": ability.offset,
             "identity": person.identity_offset,
         }),
-    };
-    Ok(Parsed {
-        player,
-        team: ability.team,
-        contract_team: contract.team,
     })
 }
 
@@ -282,35 +267,15 @@ fn attributes(raw: &[u8]) -> BTreeMap<String, u8> {
         .collect()
 }
 
-fn club_name(club_map: &HashMap<u32, &Club>, id: Option<u32>) -> Option<String> {
-    id.and_then(|id| club_map.get(&id).map(|c| c.short_name.clone()))
-}
-
-/// Reserve/youth teams whose record names no club: take the club their players are contracted to.
-fn assign_clubs_by_contract(players: &mut [Parsed], club_map: &HashMap<u32, &Club>) {
-    let rows: Vec<_> = players
-        .iter()
-        .filter(|p| p.player.club_id.is_none())
-        .filter_map(|p| Some((p.team, p.contract_team?)))
-        .collect();
-    let team_club = teams::club_by_contract(&rows, &club_map.keys().copied().collect());
-    for p in players.iter_mut() {
-        if let (None, Some(&id)) = (p.player.club_id, team_club.get(&p.team)) {
-            p.player.club_id = Some(id);
-            p.player.club = club_name(club_map, Some(id));
-        }
-    }
-}
-
 /// The club the user manages, named in the save summary. Only clubs with players count:
 /// league names in the summary can collide with club-less records.
 fn managed_club(
     archive: &mut Archive,
     clubs: &[Club],
-    players: &[Parsed],
+    players: &[Player],
     cancel: &CancelFlag,
 ) -> Option<u32> {
-    let with_players: HashSet<_> = players.iter().filter_map(|p| p.player.club_id).collect();
+    let with_players: HashSet<_> = players.iter().filter_map(|p| p.club_id).collect();
     let names: Vec<(u32, &str)> = clubs
         .iter()
         .filter(|c| with_players.contains(&c.id))
@@ -331,14 +296,14 @@ pub fn managed_club_id(summary: &[u8], clubs: &[(u32, &str)]) -> Option<u32> {
     })
 }
 
-fn validate(players: &[Parsed], archive: &Archive) -> Result<()> {
+fn validate(players: &[Player], archive: &Archive) -> Result<()> {
     if players.is_empty() {
         return Err(Error::new(
             "NO_PLAYERS",
             "No supported player records were found in this save.",
         ));
     }
-    let ids: HashSet<_> = players.iter().map(|p| p.player.id).collect();
+    let ids: HashSet<_> = players.iter().map(|p| p.id).collect();
     if ids.len() != players.len() {
         return Err(Error::new(
             "AMBIGUOUS_IDENTITIES",
@@ -372,7 +337,7 @@ fn diagnostics(
     linked: &Linked,
     clubs: &[Club],
     teams: &[Team],
-    players: &[Parsed],
+    players: &[Player],
     started: Instant,
 ) -> Value {
     json!({
@@ -384,7 +349,7 @@ fn diagnostics(
         "unbound": linked.unbound,
         "clubs": clubs.len(),
         "teams": teams.len(),
-        "clubLinks": players.iter().filter(|p| p.player.club.is_some()).count(),
+        "clubLinks": players.iter().filter(|p| p.club.is_some()).count(),
         "databaseBytes": db.len(),
         "elapsedMs": started.elapsed().as_millis(),
     })

@@ -217,6 +217,58 @@ fn roster(db: &[u8], from: usize, limit: usize, valid: &HashSet<u32>) -> Vec<u32
     vec![]
 }
 
+/// Each player's club, by the first rule that gives one:
+/// 1. the team record their ability block names,
+/// 2. a roster they are on (a first team wins over reserve and youth teams),
+/// 3. the club most contracts of their ability team name.
+///
+/// `players` are (person id, ability team, contract team); `clubs` holds the club ids.
+pub fn player_clubs(
+    teams: &[Team],
+    players: &[(u32, u32, Option<u32>)],
+    clubs: &HashSet<u32>,
+) -> Vec<Option<u32>> {
+    let by_ordinal: HashMap<_, _> = teams.iter().map(|t| (t.ordinal + 1, t)).collect();
+    let squads = squads(teams);
+    let mut found: Vec<_> = players
+        .iter()
+        .map(|&(person, team, _)| {
+            by_ordinal
+                .get(&team)
+                .and_then(|t| t.club)
+                .or_else(|| squads.get(&person).copied())
+        })
+        .collect();
+    let rows: Vec<_> = players
+        .iter()
+        .zip(&found)
+        .filter(|(_, club)| club.is_none())
+        .filter_map(|(&(_, team, contract), _)| Some((team, contract?)))
+        .collect();
+    let votes = club_by_contract(&rows, clubs);
+    for (club, &(_, team, _)) in found.iter_mut().zip(players) {
+        if club.is_none() {
+            *club = votes.get(&team).copied();
+        }
+    }
+    found
+}
+
+/// Person id to club, from the rosters of teams that have a club. A first team (kind 100)
+/// wins over reserve and youth teams.
+fn squads(teams: &[Team]) -> HashMap<u32, u32> {
+    let mut squads = HashMap::new();
+    for team in teams {
+        let Some(club) = team.club else { continue };
+        for &id in &team.members {
+            if team.kind == 100 || !squads.contains_key(&id) {
+                squads.insert(id, club);
+            }
+        }
+    }
+    squads
+}
+
 /// For teams whose own record names no club: the club most of their players' contracts name.
 /// `rows` are (team id, contract team field). A tie, or a field that is not a club, gives nothing.
 pub fn club_by_contract(rows: &[(u32, u32)], clubs: &HashSet<u32>) -> HashMap<u32, u32> {

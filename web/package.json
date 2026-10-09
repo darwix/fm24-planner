@@ -1,0 +1,41 @@
+{
+  "name": "fm-squad-planner",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc",
+    "lint": "tsc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "cd web && npx lint-staged"
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,html,css,json,md,yml}": "prettier --write"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "simple-git-hooks": "^2.11.1",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.6",
+    "recoil": "^0.7.7",
+    "swr": "^2.5.1"
+  }
+}

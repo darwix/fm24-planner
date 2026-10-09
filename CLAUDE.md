@@ -13,11 +13,23 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 
 ## Status: React app on a patched SaveLens backend (real wage, contract end, value)
 
-`src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to a SaveLens server on :4242.
+**Layout**: the repo root is the SaveLens clone (Rust in `native/`, `tests/`; no desktop app, browser only), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; Vite builds to `web/dist/client`, which the Rust server embeds). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
 
-The shipped SaveLens exe does not expose contract data, so the private clone `savelens-src/` (gitignored, no licence, never publish) is patched: `native/parser/contract.rs` reads weekly wage (GBP, before tax), contract end and value (GBP) from the save; the search API returns `wage`, `contractEnd`, `value`. Build and run it instead of the shipped exe: `cd savelens-src && cargo build --release --bin fm-savelens-24-server`, then `target/release/fm-savelens-24-server.exe --no-open --port 4242`. Tests: `cargo test --release` (fixtures in `tests/fixtures`, real bytes of four players). Layout notes: wage = u32 after `[eid][team][00 x4]`, contract end = `(day,year)` 12 bytes after the u32 before an `FF FF FF FF` run, value = u32 right after the 54-byte attribute block. Not decoded: transfer-listed, loan-listed, sales value. Coverage is high for top players and thin for low-rated or unsigned ones.
+`web/src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to a SaveLens server on :4242.
 
-Frontend: save list, import, club squad, player page, shortlist (CA match, tags contract expiring <=12 months and cheap <=GBP 5M) and scouting all use live backend queries (top 250 per query; expiry and value filter client-side). Positions use the backend's labels (AMC, not AM). Money shows in GBP. Run: `npm run dev`, `npm test`, `npm run typecheck`.
+The shipped SaveLens exe does not expose contract data, so the SaveLens clone (now the repo root) is patched: `native/parser/contract.rs` reads weekly wage (GBP, before tax), contract end and value (GBP) from the save; the search API returns `wage`, `contractEnd`, `value`. Build and run it instead of the shipped exe: `cargo build --release --bin fm-savelens-24-server` (from the root), then `target/release/fm-savelens-24-server.exe --no-open --port 4242`. Tests: `cargo test --release` (fixtures in `tests/fixtures`, real bytes of four players). Layout notes: wage = u32 after `[eid][team][00 x4]`, contract end = `(day,year)` 12 bytes after the u32 before an `FF FF FF FF` run, value = u32 right after the 54-byte attribute block. Not decoded: transfer-listed, loan-listed, sales value. Coverage is high for top players and thin for low-rated or unsigned ones.
+
+Frontend: save list, import, club squad, player page, shortlist (CA match, tags contract expiring <=12 months and cheap <=GBP 5M) and scouting all use live backend queries (top 250 per query; expiry and value filter client-side). Positions use the backend's labels (AMC, not AM). Money shows in GBP. Run (in `web/`): `npm run dev`, `npm test`, `npm run typecheck`.
+
+### Squad behaviour in the React app
+
+- **Managed club**: the backend snapshot returns `managedClubId`, read from the club name in `save_game_summary.dat` (only clubs that have players are matched; ambiguous or no match = none). The upload page prefills the club box with it.
+- **Open squad** shows a loading state while the squad is fetched.
+- **Pitch**: drag a starter onto another starter to swap spots, or onto a dashed Empty slot to move there. Removing a starter promotes the best cover who can play that group; the slot is Empty only if nobody can.
+- **Position groups**: a player has one main position `p` plus `pos` (every position he can play) and `cover` (extra groups he is counted in). `inGroup`/`need` in `utils/logic.ts` count both. The depth panel shows "+ Add cover" always, even over target.
+- **Find replacement** and **Add cover** share `/shortlist`. "From your club" lists squad players who can play the group (Promote, Swap spots or Use as cover); "Shortlist" is the outside search. Squad players already in "From your club" are left out of the outside list; others stay so they can cover several groups.
+- **Match score**: `50 + 2 x (CA - target CA)`, clamped 1-99, so higher CA ranks first. Add cover target = squad average CA - 10.
+- **Persistence**: local storage keeps only the arrangement (ids, group, pitch spot, covers, empty slots) as `fm:session` and `fm:arr:<snapshotId>:<club>`. Player data is fetched fresh on restore (`loadSquad`). Only a 404 drops a player; any other error fails the restore and leaves storage untouched. A new save version gets a new snapshot id and starts fresh. No reset button: clear the `fm:` keys in the console.
 
 Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` and `c-compare.html` are rejected alternatives, `index.html` is the first rejected draft. Shared mock data is in `mock/data.js` (placeholder, not parsed from a save).
 
@@ -47,9 +59,13 @@ Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` 
 - Write tests first and commit them, then implement (per global workflow).
 - Build the parser from the SaveLens approach; replace mock data.
 - Per global rules: pre-commit Prettier hook and a GitHub Actions PR workflow (lint/format/tests) for the real project.
-- Dir is not yet a git repo.
+- Open bug: some contract ends decode to a past date (Mirco Soldi, id 621367, shows 2050-03-20 in a 2053 save, so 0 months left). Dump his record and compare with a correct player.
+- Dir is a git repo; the squad/persistence work above is uncommitted.
 
 ## Gotchas
 
 - `agent-browser open` with only a hash change does not reload; use `agent-browser reload`.
+- Stop the SaveLens server before `cargo build` (Windows locks the exe). Bump `PARSER_VERSION` in `native/parser/mod.rs` when parser output changes, or re-import reuses the cached snapshot.
+- `agent-browser` is headless by default; use `--headed` to watch. Element refs change after each click, so re-snapshot first.
+- Vitest: a `beforeEach` that returns a mock runs it as a cleanup hook; use braces. `src/services/save.test.ts` holds the API client tests, so new service tests go in their own file.
 - CSS class `.up` is the delta colour in `a-board.html`; do not reuse it for layout.

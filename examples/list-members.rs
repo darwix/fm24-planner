@@ -1,4 +1,4 @@
-use fm_savelens_backend::parser::archive::Archive;
+use fm_savelens_backend::adapters::parser::archive::Archive;
 use tokio_util::sync::CancellationToken;
 fn main() {
     let p = std::env::args().nth(1).unwrap();

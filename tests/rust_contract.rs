@@ -1,6 +1,6 @@
 // Private reverse-engineering tests. Fixtures are the 800 bytes before a player's
 // person record in an FM24 save; expected values are what the game showed.
-use fm_savelens_backend::parser::contract::{find, value};
+use fm_savelens_backend::adapters::parser::contract::{find, value};
 
 fn bytes(hex: &str) -> Vec<u8> {
     hex.split_whitespace()

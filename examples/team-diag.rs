@@ -1,5 +1,5 @@
 // private diagnostic: why does a player with a contract have no club? read-only.
-use fm_savelens_backend::parser::{archive::Archive, records};
+use fm_savelens_backend::adapters::parser::{archive::Archive, records};
 use std::{collections::HashMap, path::Path};
 use tokio_util::sync::CancellationToken;
 fn main() {

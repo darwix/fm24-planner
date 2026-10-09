@@ -1,5 +1,5 @@
 mod support;
-use fm_savelens_backend::{parser::parse_save, storage};
+use fm_savelens_backend::adapters::{parser::parse_save, persistence::snapshot};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
@@ -21,7 +21,7 @@ fn search_filters_contract_end_and_value_in_sql() {
          UPDATE players SET contract_end='2056-06-30', value=1000000 WHERE id=3;",
         )
         .unwrap();
-    let db = storage::open_snapshot(&dbpath).unwrap();
+    let db = snapshot::open_snapshot(&dbpath).unwrap();
     let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     // inclusive cutoff; players without a contract never match
     assert_eq!(total("contractEndMax=2053-06-30"), 1);
@@ -45,7 +45,7 @@ fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
 #[test]
 fn main_position_is_the_best_rated_position() {
     let dir = tempfile::tempdir().unwrap();
-    let db = storage::open_snapshot(&snapshot(&dir)).unwrap();
+    let db = snapshot::open_snapshot(&snapshot(&dir)).unwrap();
     let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     // every fixture player is a striker (position 12)
     assert_eq!(total("mainPosition=12"), 64);
@@ -64,7 +64,7 @@ fn unknown_value_and_excluded_ids() {
             "UPDATE players SET value=1000000; UPDATE players SET value=NULL WHERE id IN (1,2);",
         )
         .unwrap();
-    let db = storage::open_snapshot(&dbpath).unwrap();
+    let db = snapshot::open_snapshot(&dbpath).unwrap();
     let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=1000000"), 62);
     assert_eq!(total("valueMax=1000000&valueUnknown=1"), 64);
@@ -91,7 +91,7 @@ fn post_body_becomes_the_same_query_as_get() {
 #[test]
 fn zero_value_in_the_save_is_stored_as_unknown() {
     let dir = tempfile::tempdir().unwrap();
-    let db = storage::open_snapshot(&snapshot(&dir)).unwrap();
+    let db = snapshot::open_snapshot(&snapshot(&dir)).unwrap();
     // fixture players carry a value of 0, which must not count as cheap
     let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=5000000"), 0);
@@ -109,7 +109,7 @@ fn no_contract_keeps_only_players_without_a_contract_end() {
          UPDATE players SET contract_end='2056-06-30' WHERE id=3;",
         )
         .unwrap();
-    let db = storage::open_snapshot(&dbpath).unwrap();
+    let db = snapshot::open_snapshot(&dbpath).unwrap();
     let total = |q: &str| support::search(&db, q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("noContract=1"), 63);
     assert_eq!(total(""), 64);

@@ -1,5 +1,5 @@
 // Reserve/youth team records carry their own name instead of the ten zero bytes; they must still link to a club.
-use fm_savelens_backend::parser::records::{teams, Club};
+use fm_savelens_backend::adapters::parser::records::{teams, Club};
 use std::collections::HashSet;
 use tokio_util::sync::CancellationToken;
 

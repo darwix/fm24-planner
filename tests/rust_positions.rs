@@ -1,7 +1,10 @@
 mod support;
 use fm_savelens_backend::{
-    parser::{ParsedSave, Player, CATALOG},
-    storage,
+    adapters::persistence::snapshot,
+    domain::{
+        catalog::CATALOG,
+        entities::{ParsedSave, Player},
+    },
 };
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -46,7 +49,7 @@ fn snapshot() -> (tempfile::TempDir, Connection) {
     };
     let path = dir.path().join("snapshot.sqlite");
     support::create_snapshot(&path, save, json!({}), &CancellationToken::new()).unwrap();
-    let db = storage::open_snapshot(&path).unwrap();
+    let db = snapshot::open_snapshot(&path).unwrap();
     (dir, db)
 }
 

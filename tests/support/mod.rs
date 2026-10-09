@@ -129,7 +129,11 @@ pub fn create_snapshot(
     cancel: &tokio_util::sync::CancellationToken,
 ) -> fm_savelens_backend::Result<()> {
     use fm_savelens_backend::application::use_cases::build_snapshot;
-    fm_savelens_backend::storage::create_snapshot(path, &build_snapshot(save, meta)?, cancel)
+    fm_savelens_backend::adapters::persistence::snapshot::create_snapshot(
+        path,
+        &build_snapshot(save, meta)?,
+        cancel,
+    )
 }
 
 /// Parses `query` and searches the snapshot, giving the page as JSON.
@@ -139,7 +143,8 @@ pub fn search(
     query: &str,
 ) -> fm_savelens_backend::Result<serde_json::Value> {
     use fm_savelens_backend::adapters::http::dto::player_query::parse_filter;
-    let page = fm_savelens_backend::storage::search(db, &parse_filter(query)?)?;
+    let page =
+        fm_savelens_backend::adapters::persistence::player::search(db, &parse_filter(query)?)?;
     Ok(serde_json::to_value(page)?)
 }
 

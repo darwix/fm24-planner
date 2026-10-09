@@ -1,10 +1,9 @@
 mod support;
 use fm_savelens_backend::{
-    adapters::persistence::SqliteSnapshotRepository,
+    adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
+    adapters::persistence::{snapshot, SqliteSnapshotRepository},
     application::use_cases::{build_snapshot, ports::SnapshotRepository},
-    domain::entities::SnapshotId,
-    parser::{archive::Archive, parse_save, CATALOG, PARSER_VERSION},
-    storage,
+    domain::{catalog::CATALOG, entities::SnapshotId},
 };
 use serde_json::json;
 use std::fs;
@@ -89,7 +88,7 @@ fn compressed_and_plain_records_match_and_query_correctly() {
         let dbpath = dir.path().join(format!("{compressed}.sqlite"));
         variants.push(serde_json::to_value(&save.players).unwrap());
         support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
-        let db = storage::open_snapshot(&dbpath).unwrap();
+        let db = snapshot::open_snapshot(&dbpath).unwrap();
         let first = support::search(
             &db,
             "q=alvaro&nation=12&position=12&attr_pace=13&caMin=200&paMax=199&limit=25",
@@ -123,14 +122,18 @@ fn compressed_and_plain_records_match_and_query_correctly() {
         ] {
             assert!(support::search(&db, q).is_err(), "{q}");
         }
-        assert!(storage::player(&db, 99999).unwrap().is_none());
+        assert!(
+            fm_savelens_backend::adapters::persistence::player::player(&db, 99999)
+                .unwrap()
+                .is_none()
+        );
     }
     assert_eq!(variants[0], variants[1]);
 }
 
 #[test]
 fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
-    use fm_savelens_backend::{parser::PARSER_VERSION, utils::files::mtime};
+    use fm_savelens_backend::{adapters::parser::PARSER_VERSION, utils::files::mtime};
     use rusqlite::Connection;
     use serde_json::Value;
     use std::time::{Duration, UNIX_EPOCH};
@@ -256,7 +259,7 @@ fn foreign_ability_ownership_is_excluded_and_sorting_is_directional() {
     assert_eq!(save.players.iter().find(|p| p.id == 2).unwrap().ca, 100);
     let dbpath = dir.path().join("snapshot.sqlite");
     support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
-    let db = storage::open_snapshot(&dbpath).unwrap();
+    let db = snapshot::open_snapshot(&dbpath).unwrap();
     assert_eq!(
         support::search(&db, "sort=ca&direction=asc").unwrap()["players"][0]["id"],
         2

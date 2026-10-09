@@ -1,4 +1,4 @@
-use fm_savelens_backend::parser::parse_save;
+use fm_savelens_backend::adapters::parser::parse_save;
 use std::{
     io::{self, Write},
     path::Path,

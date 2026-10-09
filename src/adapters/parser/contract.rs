@@ -2,7 +2,7 @@
 // Contract block sits just before the person record:
 //   [start yr u16][00 00][X u32][FF FF FF FF] ... [expiry day u16][expiry yr u16]   (expiry = X + 12)
 //   [eid u32][team u32][00 x4][weekly wage u32][01 ?? 00] ...                        (wage anchor)
-use super::date_of;
+use super::save::date_of;
 use crate::utils::bytes::{u16, u32};
 
 #[derive(Default)]

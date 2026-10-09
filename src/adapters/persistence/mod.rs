@@ -3,7 +3,13 @@ mod save_files;
 mod settings;
 pub mod snapshot;
 
-pub use player::{player, search, SqlitePlayerRepository};
+pub use player::SqlitePlayerRepository;
 pub use save_files::FsSaveFiles;
 pub use settings::JsonSettingsRepository;
-pub use snapshot::{create_snapshot, metadata, open_snapshot, SqliteSnapshotRepository};
+pub use snapshot::SqliteSnapshotRepository;
+
+impl From<rusqlite::Error> for crate::Error {
+    fn from(e: rusqlite::Error) -> Self {
+        Self::new("DATABASE", e.to_string())
+    }
+}

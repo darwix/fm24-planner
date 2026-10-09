@@ -1,14 +1,12 @@
 use crate::{
-    adapters::{
-        http::{
-            app_state::Shared,
-            dto::system::{FolderBody, HealthResponse, SettingsResponse},
-            error::ApiError,
-            json_body::JsonBody,
-            response::{blocking, reply},
-        },
-        parser::CATALOG,
+    adapters::http::{
+        app_state::Shared,
+        dto::system::{FolderBody, HealthResponse, SettingsResponse},
+        error::ApiError,
+        json_body::JsonBody,
+        response::{blocking, reply},
     },
+    domain::catalog::CATALOG,
     VERSION,
 };
 use axum::{extract::State, response::Response, routing::get, Router};

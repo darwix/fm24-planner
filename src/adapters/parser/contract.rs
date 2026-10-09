@@ -28,7 +28,7 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
     let Some(i) = anchor else {
         return Contract::default();
     };
-    let contract_end = (4..i.saturating_sub(11)).rev().find_map(|q| {
+    let expiry = |q: usize| {
         let (day, year) = (u16(window, q + 12) & 511, u16(window, q + 14));
         let ok = (2020..=2100).contains(&u16(window, q - 4))
             && window[q - 2..q] == [0; 2]
@@ -39,6 +39,13 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
             && (2020..=2100).contains(&year)
             && year != 2047; // 0x07FF: all-ones sentinel, not a date
         ok.then(|| date_of(year, day).ok()).flatten()
+    };
+    // A false match can sit 4 bytes after the real one, so step back while the earlier one also matches.
+    let contract_end = (4..i.saturating_sub(11)).rev().find(|&q| expiry(q).is_some()).and_then(|mut q| {
+        while q >= 8 && expiry(q - 4).is_some() {
+            q -= 4;
+        }
+        expiry(q)
     });
     Contract {
         wage: Some(u32(window, i + 12)),

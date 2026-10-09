@@ -1,7 +1,4 @@
-use crate::application::{
-    use_cases::{PlayerUseCase, SaveUseCase, SettingsUseCase},
-    Workspace,
-};
+use crate::application::use_cases::{PlayerUseCase, SaveUseCase, SettingsUseCase};
 use std::sync::Arc;
 
 /// What every route handler can reach: the use cases.
@@ -13,11 +10,15 @@ pub struct AppState {
 pub type Shared = Arc<AppState>;
 
 impl AppState {
-    pub fn new(ws: Arc<Workspace>) -> Shared {
+    pub fn new(
+        saves: Arc<SaveUseCase>,
+        players: Arc<PlayerUseCase>,
+        settings: Arc<SettingsUseCase>,
+    ) -> Shared {
         Arc::new(Self {
-            saves: Arc::new(SaveUseCase::new(ws.clone())),
-            players: Arc::new(PlayerUseCase::new(ws.clone())),
-            settings: Arc::new(SettingsUseCase::new(ws)),
+            saves,
+            players,
+            settings,
         })
     }
 }

@@ -2,12 +2,15 @@ use crate::{
     adapters::{
         http::app_state::{AppState, Shared},
         parser::reader::FmSaveReader,
-        persistence::{SqlitePlayerRepository, SqliteSnapshotRepository},
+        persistence::{
+            FsSaveFiles, JsonSettingsRepository, SqlitePlayerRepository, SqliteSnapshotRepository,
+        },
     },
-    application::{use_cases::wait_for, Workspace},
+    application::use_cases::{wait_for, PlayerUseCase, SaveUseCase, Session, SettingsUseCase},
     infra::{
         app::create_app,
         config::{default_folder, AppConfig, Command},
+        data_dir::DataDir,
     },
     Error, Result, VERSION,
 };
@@ -21,6 +24,7 @@ pub struct RunningServer {
     pub app: Shared,
     shutdown: CancellationToken,
     task: JoinHandle<std::io::Result<()>>,
+    _data: DataDir,
 }
 
 impl RunningServer {
@@ -44,14 +48,24 @@ impl RunningServer {
 
 /// Opens the data directory, binds `port` (0 = any), and serves until `shutdown`.
 pub async fn start(port: u16, data: &Path) -> Result<RunningServer> {
-    let workspace = Workspace::open(
-        data,
-        Arc::new(FmSaveReader),
-        Arc::new(SqliteSnapshotRepository),
-        Arc::new(SqlitePlayerRepository),
+    let data = DataDir::open(data)?;
+    let files = Arc::new(FsSaveFiles);
+    let session = Session::new(Arc::new(JsonSettingsRepository::new(
+        data.root.clone(),
         default_folder(),
-    )?;
-    let app = AppState::new(workspace);
+    )))?;
+    let app = AppState::new(
+        Arc::new(SaveUseCase::new(
+            session.clone(),
+            Arc::new(FmSaveReader),
+            files.clone(),
+            Arc::new(SqliteSnapshotRepository::new(data.snapshots())),
+        )),
+        Arc::new(PlayerUseCase::new(Arc::new(SqlitePlayerRepository::new(
+            data.snapshots(),
+        )))),
+        Arc::new(SettingsUseCase::new(session, files)),
+    );
     let listener = TcpListener::bind(("127.0.0.1", port)).await?;
     let address = listener.local_addr()?;
     let router = create_app(app.clone(), address.port());
@@ -67,6 +81,7 @@ pub async fn start(port: u16, data: &Path) -> Result<RunningServer> {
         app,
         shutdown,
         task,
+        _data: data,
     })
 }
 

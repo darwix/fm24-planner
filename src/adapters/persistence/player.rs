@@ -1,11 +1,14 @@
-use super::{nation_name, snapshot::open_snapshot};
+use super::{
+    nation_name,
+    snapshot::{open_snapshot, snapshot_file},
+};
 use crate::{
-    application::use_cases::ports::PlayerRepository, parser::CATALOG, utils::text::normalize,
-    Error, Result,
+    application::use_cases::ports::PlayerRepository, domain::entities::SnapshotId, parser::CATALOG,
+    utils::text::normalize, Error, Result,
 };
 use rusqlite::{params_from_iter, types::Value as SqlValue, Connection};
 use serde_json::{json, Value};
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::PathBuf};
 
 pub fn player(db: &Connection, id: u32) -> Result<Value> {
     use rusqlite::OptionalExtension;
@@ -230,14 +233,21 @@ pub fn search(db: &Connection, query: &str) -> Result<Value> {
     Ok(json!({"total":total,"page":page,"limit":limit,"players":players}))
 }
 
-/// Player queries on a snapshot file.
-pub struct SqlitePlayerRepository;
+/// Player queries on the snapshot files in `dir`.
+pub struct SqlitePlayerRepository {
+    dir: PathBuf,
+}
+impl SqlitePlayerRepository {
+    pub fn new(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+}
 
 impl PlayerRepository for SqlitePlayerRepository {
-    fn player(&self, path: &Path, id: u32) -> Result<Value> {
-        player(&open_snapshot(path)?, id)
+    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Value> {
+        player(&open_snapshot(&snapshot_file(&self.dir, snapshot)?)?, id)
     }
-    fn search(&self, path: &Path, query: &str) -> Result<Value> {
-        search(&open_snapshot(path)?, query)
+    fn search(&self, snapshot: &SnapshotId, query: &str) -> Result<Value> {
+        search(&open_snapshot(&snapshot_file(&self.dir, snapshot)?)?, query)
     }
 }

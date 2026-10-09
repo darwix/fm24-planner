@@ -1,4 +1,7 @@
-use crate::{domain::entities::ParsedSave, Result};
+use crate::{
+    domain::entities::{ParsedSave, Settings, SnapshotId, SourceFile},
+    Result,
+};
 use serde_json::Value;
 use std::path::Path;
 use tokio_util::sync::CancellationToken;
@@ -15,20 +18,41 @@ pub trait SaveReader: Send + Sync {
     ) -> Result<ParsedSave>;
 }
 
-/// Stores imported saves as snapshot files.
+/// Looks at `.fm` files and folders on disk.
+pub trait SaveFiles: Send + Sync {
+    /// The `.fm` files directly inside `folder`.
+    fn scan(&self, folder: &str) -> Result<Vec<SourceFile>>;
+    fn stat(&self, path: &Path) -> Result<SourceFile>;
+    /// The canonical path of an existing folder.
+    fn directory(&self, folder: &str) -> Result<String>;
+}
+
+/// Keeps the user settings between runs.
+pub trait SettingsRepository: Send + Sync {
+    fn load(&self) -> Result<Settings>;
+    fn save(&self, settings: &Settings) -> Result<()>;
+}
+
+/// Stores imported saves as snapshots. An import is written under its job id
+/// first and published under the snapshot id once it is complete.
 pub trait SnapshotRepository: Send + Sync {
+    fn exists(&self, id: &SnapshotId) -> bool;
     fn create(
         &self,
-        path: &Path,
+        job_id: &str,
         save: &ParsedSave,
         meta: Value,
         cancel: &CancellationToken,
     ) -> Result<()>;
-    fn metadata(&self, path: &Path) -> Result<Value>;
+    fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()>;
+    fn unpublish(&self, id: &SnapshotId) -> Result<()>;
+    /// Drops the unpublished write of `job_id`, if any.
+    fn discard(&self, job_id: &str) -> Result<()>;
+    fn metadata(&self, id: &SnapshotId) -> Result<Value>;
 }
 
 /// Reads players from an imported snapshot.
 pub trait PlayerRepository: Send + Sync {
-    fn player(&self, path: &Path, id: u32) -> Result<Value>;
-    fn search(&self, path: &Path, query: &str) -> Result<Value>;
+    fn player(&self, snapshot: &SnapshotId, id: u32) -> Result<Value>;
+    fn search(&self, snapshot: &SnapshotId, query: &str) -> Result<Value>;
 }

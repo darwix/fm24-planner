@@ -1,6 +1,7 @@
 use super::nation_name;
 use crate::{
     application::use_cases::ports::SnapshotRepository,
+    domain::entities::SnapshotId,
     parser::{archive::check, ParsedSave, CATALOG, PARSER_VERSION},
     utils::text::normalize,
     Error, Result,
@@ -8,7 +9,11 @@ use crate::{
 use chrono::Utc;
 use rusqlite::{params_from_iter, types::Value as SqlValue, Connection, OpenFlags};
 use serde_json::{json, Value};
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+};
 use tokio_util::sync::CancellationToken;
 
 pub fn create_snapshot(
@@ -162,20 +167,57 @@ pub fn metadata(db: &Connection) -> Result<Value> {
     Ok(m)
 }
 
-/// One SQLite file per imported save.
-pub struct SqliteSnapshotRepository;
+/// One SQLite file per imported save, kept in `dir`.
+pub struct SqliteSnapshotRepository {
+    dir: PathBuf,
+}
+impl SqliteSnapshotRepository {
+    pub fn new(dir: PathBuf) -> Self {
+        Self { dir }
+    }
+    fn partial(&self, job_id: &str) -> PathBuf {
+        self.dir.join(format!("{job_id}.partial.sqlite"))
+    }
+}
+
+/// The file of an imported snapshot.
+pub(super) fn snapshot_file(dir: &Path, id: &SnapshotId) -> Result<PathBuf> {
+    let path = dir.join(format!("{id}.sqlite"));
+    if !path.is_file() {
+        return Err(Error::query("This save has not been imported."));
+    }
+    Ok(path)
+}
 
 impl SnapshotRepository for SqliteSnapshotRepository {
+    fn exists(&self, id: &SnapshotId) -> bool {
+        snapshot_file(&self.dir, id).is_ok()
+    }
     fn create(
         &self,
-        path: &Path,
+        job_id: &str,
         save: &ParsedSave,
         meta: Value,
         cancel: &CancellationToken,
     ) -> Result<()> {
-        create_snapshot(path, save, meta, cancel)
+        create_snapshot(&self.partial(job_id), save, meta, cancel)
     }
-    fn metadata(&self, path: &Path) -> Result<Value> {
-        metadata(&open_snapshot(path)?)
+    fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()> {
+        fs::rename(self.partial(job_id), self.dir.join(format!("{id}.sqlite")))?;
+        Ok(())
+    }
+    fn unpublish(&self, id: &SnapshotId) -> Result<()> {
+        fs::remove_file(self.dir.join(format!("{id}.sqlite")))?;
+        Ok(())
+    }
+    fn discard(&self, job_id: &str) -> Result<()> {
+        let partial = self.partial(job_id);
+        if partial.exists() {
+            fs::remove_file(partial)?;
+        }
+        Ok(())
+    }
+    fn metadata(&self, id: &SnapshotId) -> Result<Value> {
+        metadata(&open_snapshot(&snapshot_file(&self.dir, id)?)?)
     }
 }

@@ -25,7 +25,7 @@ async fn get_snapshot(
     State(app): State<Shared>,
     Path(id): Path<String>,
 ) -> Result<Response, ApiError> {
-    blocking(app, 200, move |app| app.players.snapshot(&id)).await
+    blocking(app, 200, move |app| app.saves.snapshot(&id)).await
 }
 async fn search_players(
     State(app): State<Shared>,

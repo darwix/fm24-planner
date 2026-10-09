@@ -1,16 +1,15 @@
 use crate::{
-    application::{
-        state::{Active, Completion},
-        use_cases::SaveUseCase,
+    application::use_cases::{
+        session::{Active, Completion},
+        SaveUseCase,
     },
-    domain::entities::{Job, SaveFile},
-    utils::{cancel::check, files::mtime},
+    domain::entities::{Job, SaveFile, SnapshotId},
+    utils::cancel::check,
     Error, Result,
 };
 use chrono::Utc;
 use serde_json::json;
 use std::{
-    fs,
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
     time::Instant,
@@ -19,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 
 impl SaveUseCase {
     pub fn start_import(self: &Arc<Self>, save_id: &str) -> Result<Job> {
-        let mut inner = self.ws.inner.lock().unwrap();
+        let mut inner = self.session.inner.lock().unwrap();
         if inner.shutting_down {
             return Err(Error::new("SHUTTING_DOWN", "The app is shutting down."));
         }
@@ -67,7 +66,7 @@ impl SaveUseCase {
         if save.cached {
             let mut settings = inner.settings.clone();
             settings.last_snapshot = Some(save.snapshot_id);
-            self.ws.persist(&settings)?;
+            self.session.persist(&settings)?;
             inner.settings = settings;
         } else {
             let active = Active {
@@ -91,54 +90,45 @@ impl SaveUseCase {
     }
     fn run_import(self: Arc<Self>, active: Active, file: PathBuf, save: SaveFile) {
         let start = Instant::now();
-        let temporary = self
-            .ws
-            .data
-            .join("snapshots")
-            .join(format!("{}.partial.sqlite", active.id));
         let result =
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<usize> {
                 check(&active.cancel)?;
-                let before = fs::metadata(&file)?;
-                if before.len() != save.size || mtime(&before)? != save.mtime {
+                let before = self.files.stat(&file)?;
+                if before.size != save.size || before.mtime != save.mtime {
                     return Err(Error::new(
                         "SAVE_CHANGED",
                         "The save changed before import began. Refresh the save list and retry.",
                     ));
                 }
-                let parsed = self.ws.reader.read(&file, &active.cancel, &|progress, message| {
-                    let mut inner = self.ws.inner.lock().unwrap();
+                let parsed = self.reader.read(&file, &active.cancel, &|progress, message| {
+                    let mut inner = self.session.inner.lock().unwrap();
                     if let Some(job) = inner.jobs.get_mut(&active.id) {
                         job.progress = progress;
                         job.message = message.into();
                     }
                 })?;
-                self.ws.snapshots.create(
-                    &temporary,
+                self.snapshots.create(
+                    &active.id,
                     &parsed,
-                    json!({"snapshotId":save.snapshot_id,"sourcePath":file,"sourceName":save.name,"sourceSize":save.size,"sourceMtime":save.mtime,"parserVersion":self.ws.reader.version()}),
+                    json!({"snapshotId":save.snapshot_id,"sourcePath":file,"sourceName":save.name,"sourceSize":save.size,"sourceMtime":save.mtime,"parserVersion":self.reader.version()}),
                     &active.cancel,
                 )?;
-                let after = fs::metadata(&file)?;
-                if after.len() != before.len() || after.modified()? != before.modified()? {
+                let after = self.files.stat(&file)?;
+                if after.size != before.size || after.modified != before.modified {
                     return Err(Error::new(
                         "SAVE_CHANGED",
                         "The save changed during import. Wait for saving to finish and retry.",
                     ));
                 }
                 // Serialize final publication with cancellation and settings changes.
-                let mut inner = self.ws.inner.lock().unwrap();
+                let mut inner = self.session.inner.lock().unwrap();
                 check(&active.cancel)?;
-                let destination = self
-                    .ws
-                    .data
-                    .join("snapshots")
-                    .join(format!("{}.sqlite", save.snapshot_id));
-                fs::rename(&temporary, &destination)?;
+                let snapshot_id = SnapshotId::parse(&save.snapshot_id)?;
+                self.snapshots.publish(&active.id, &snapshot_id)?;
                 let mut settings = inner.settings.clone();
                 settings.last_snapshot = Some(save.snapshot_id.clone());
-                if let Err(error) = self.ws.persist(&settings) {
-                    fs::remove_file(&destination)?;
+                if let Err(error) = self.session.persist(&settings) {
+                    self.snapshots.unpublish(&snapshot_id)?;
                     return Err(error);
                 }
                 inner.settings = settings;
@@ -156,14 +146,10 @@ impl SaveUseCase {
                     "The reader stopped unexpectedly.",
                 ))
             });
-        let cleanup = if temporary.exists() {
-            fs::remove_file(&temporary)
-        } else {
-            Ok(())
-        };
+        let cleanup = self.snapshots.discard(&active.id);
         {
-            let mut inner = self.ws.inner.lock().unwrap();
-            if let Err(e) = result.and_then(|_| cleanup.map_err(Error::from)) {
+            let mut inner = self.session.inner.lock().unwrap();
+            if let Err(e) = result.and_then(|_| cleanup) {
                 if let Some(job) = inner.jobs.get_mut(&active.id) {
                     job.status = if active.cancel.is_cancelled() {
                         "cancelled"
@@ -181,7 +167,7 @@ impl SaveUseCase {
         done.notify_all();
     }
     pub fn job(&self, id: &str) -> Result<Job> {
-        self.ws
+        self.session
             .inner
             .lock()
             .unwrap()
@@ -192,7 +178,7 @@ impl SaveUseCase {
     }
     pub fn cancel(&self, id: &str) -> Result<Job> {
         let active = {
-            let inner = self.ws.inner.lock().unwrap();
+            let inner = self.session.inner.lock().unwrap();
             if !inner.jobs.contains_key(id) {
                 return Err(Error::new("NOT_FOUND", "Import not found."));
             }
@@ -206,17 +192,17 @@ impl SaveUseCase {
         if let Some(active) = active {
             wait_for(&active.done);
         }
-        Ok(self.ws.inner.lock().unwrap().jobs[id].clone())
+        Ok(self.session.inner.lock().unwrap().jobs[id].clone())
     }
     pub fn stop_import(&self) {
-        let active = self.ws.inner.lock().unwrap().active.clone();
+        let active = self.session.inner.lock().unwrap().active.clone();
         if let Some(active) = active {
             active.cancel.cancel();
             wait_for(&active.done);
         }
     }
     pub fn begin_shutdown(&self) -> Option<Completion> {
-        let mut inner = self.ws.inner.lock().unwrap();
+        let mut inner = self.session.inner.lock().unwrap();
         // Use the import/publication mutex so no late request can start work
         // between capturing the active worker and stopping HTTP acceptance.
         inner.shutting_down = true;

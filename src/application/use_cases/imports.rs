@@ -4,12 +4,11 @@ use crate::{
         snapshot_builder::build_snapshot,
         SaveUseCase,
     },
-    domain::entities::{Job, SaveFile, SnapshotId},
+    domain::entities::{Job, SaveFile, SnapshotId, SnapshotMeta},
     utils::cancel::check,
     Error, Result,
 };
 use chrono::Utc;
-use serde_json::json;
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, Condvar, Mutex},
@@ -91,62 +90,72 @@ impl SaveUseCase {
     }
     fn run_import(self: Arc<Self>, active: Active, file: PathBuf, save: SaveFile) {
         let start = Instant::now();
-        let result =
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<usize> {
-                check(&active.cancel)?;
-                let before = self.files.stat(&file)?;
-                if before.size != save.size || before.mtime != save.mtime {
-                    return Err(Error::new(
-                        "SAVE_CHANGED",
-                        "The save changed before import began. Refresh the save list and retry.",
-                    ));
-                }
-                let parsed = self.reader.read(&file, &active.cancel, &|progress, message| {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<usize> {
+            check(&active.cancel)?;
+            let before = self.files.stat(&file)?;
+            if before.size != save.size || before.mtime != save.mtime {
+                return Err(Error::new(
+                    "SAVE_CHANGED",
+                    "The save changed before import began. Refresh the save list and retry.",
+                ));
+            }
+            let parsed = self
+                .reader
+                .read(&file, &active.cancel, &|progress, message| {
                     let mut inner = self.session.inner.lock().unwrap();
                     if let Some(job) = inner.jobs.get_mut(&active.id) {
                         job.progress = progress;
                         job.message = message.into();
                     }
                 })?;
-                let players = parsed.players.len();
-                let snapshot = build_snapshot(
-                    parsed,
-                    json!({"snapshotId":save.snapshot_id,"sourcePath":file,"sourceName":save.name,"sourceSize":save.size,"sourceMtime":save.mtime,"parserVersion":self.reader.version()}),
-                )?;
-                self.snapshots.create(&active.id, &snapshot, &active.cancel)?;
-                let after = self.files.stat(&file)?;
-                if after.size != before.size || after.modified != before.modified {
-                    return Err(Error::new(
-                        "SAVE_CHANGED",
-                        "The save changed during import. Wait for saving to finish and retry.",
-                    ));
-                }
-                // Serialize final publication with cancellation and settings changes.
-                let mut inner = self.session.inner.lock().unwrap();
-                check(&active.cancel)?;
-                let snapshot_id = SnapshotId::parse(&save.snapshot_id)?;
-                self.snapshots.publish(&active.id, &snapshot_id)?;
-                let mut settings = inner.settings.clone();
-                settings.last_snapshot = Some(save.snapshot_id.clone());
-                if let Err(error) = self.session.persist(&settings) {
-                    self.snapshots.unpublish(&snapshot_id)?;
-                    return Err(error);
-                }
-                inner.settings = settings;
-                let job = inner.jobs.get_mut(&active.id).unwrap();
-                job.status = "complete".into();
-                job.progress = 100;
-                job.message = "Ready".into();
-                job.player_count = Some(players);
-                job.elapsed_ms = Some(start.elapsed().as_millis());
-                Ok(players)
-            }))
-            .unwrap_or_else(|_| {
-                Err(Error::new(
-                    "IMPORT_FAILED",
-                    "The reader stopped unexpectedly.",
-                ))
-            });
+            let players = parsed.players.len();
+            let snapshot = build_snapshot(
+                parsed,
+                SnapshotMeta {
+                    snapshot_id: save.snapshot_id.clone(),
+                    source_path: file.to_string_lossy().into_owned(),
+                    source_name: save.name.clone(),
+                    source_size: save.size,
+                    source_mtime: save.mtime,
+                    parser_version: self.reader.version().to_owned(),
+                    ..Default::default()
+                },
+            );
+            self.snapshots
+                .create(&active.id, &snapshot, &active.cancel)?;
+            let after = self.files.stat(&file)?;
+            if after.size != before.size || after.modified != before.modified {
+                return Err(Error::new(
+                    "SAVE_CHANGED",
+                    "The save changed during import. Wait for saving to finish and retry.",
+                ));
+            }
+            // Serialize final publication with cancellation and settings changes.
+            let mut inner = self.session.inner.lock().unwrap();
+            check(&active.cancel)?;
+            let snapshot_id = SnapshotId::parse(&save.snapshot_id)?;
+            self.snapshots.publish(&active.id, &snapshot_id)?;
+            let mut settings = inner.settings.clone();
+            settings.last_snapshot = Some(save.snapshot_id.clone());
+            if let Err(error) = self.session.persist(&settings) {
+                self.snapshots.unpublish(&snapshot_id)?;
+                return Err(error);
+            }
+            inner.settings = settings;
+            let job = inner.jobs.get_mut(&active.id).unwrap();
+            job.status = "complete".into();
+            job.progress = 100;
+            job.message = "Ready".into();
+            job.player_count = Some(players);
+            job.elapsed_ms = Some(start.elapsed().as_millis());
+            Ok(players)
+        }))
+        .unwrap_or_else(|_| {
+            Err(Error::new(
+                "IMPORT_FAILED",
+                "The reader stopped unexpectedly.",
+            ))
+        });
         let cleanup = self.snapshots.discard(&active.id);
         {
             let mut inner = self.session.inner.lock().unwrap();

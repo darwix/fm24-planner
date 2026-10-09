@@ -1,18 +1,17 @@
 use crate::{
     domain::{
         countries::nation_name,
-        entities::{NewSnapshot, ParsedSave, PlayerDetail, PlayerRecord},
+        entities::{NamedId, NewSnapshot, ParsedSave, PlayerDetail, PlayerRecord, SnapshotMeta},
     },
     utils::text::normalize,
-    Error, Result,
 };
 use chrono::Utc;
-use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
 /// Works out everything a snapshot stores beyond the parsed save: derived
-/// player columns and the metadata summary. `source` describes the save file.
-pub fn build_snapshot(save: ParsedSave, mut source: Value) -> Result<NewSnapshot> {
+/// player columns and the metadata summary. `source` carries the snapshot id and the save file
+/// fields; the rest of the metadata is filled in here.
+pub fn build_snapshot(save: ParsedSave, source: SnapshotMeta) -> NewSnapshot {
     let ids: BTreeSet<u32> = save
         .players
         .iter()
@@ -20,33 +19,36 @@ pub fn build_snapshot(save: ParsedSave, mut source: Value) -> Result<NewSnapshot
         .collect();
     let mut nations: Vec<_> = ids
         .into_iter()
-        .map(|id| json!({"id":id,"name":nation_name(id)}))
+        .map(|id| NamedId {
+            id,
+            name: nation_name(id),
+        })
         .collect();
-    nations.sort_by_key(|v| normalize(v["name"].as_str().unwrap_or("")));
+    nations.sort_by_key(|v| normalize(&v.name));
     let used: BTreeSet<_> = save.players.iter().filter_map(|p| p.club_id).collect();
     let mut clubs: Vec<_> = save
         .clubs
         .iter()
         .filter(|c| used.contains(&c.id))
-        .map(|c| json!({"id":c.id,"name":c.short_name}))
+        .map(|c| NamedId {
+            id: c.id,
+            name: c.short_name.clone(),
+        })
         .collect();
-    clubs.sort_by_key(|v| normalize(v["name"].as_str().unwrap_or("")));
-    let fields = json!({
-        "name": save.name,
-        "gameDate": save.game_date,
-        "formatVersion": save.format_version,
-        "playerCount": save.players.len(),
-        "diagnostics": save.diagnostics,
-        "warnings": save.warnings,
-        "importedAt": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
-        "nations": nations,
-        "clubs": clubs,
-        "managedClubId": save.managed_club_id,
-    });
-    source
-        .as_object_mut()
-        .ok_or_else(|| Error::query("Invalid snapshot metadata."))?
-        .extend(fields.as_object().unwrap().clone());
+    clubs.sort_by_key(|v| normalize(&v.name));
+    let meta = SnapshotMeta {
+        name: save.name,
+        game_date: save.game_date,
+        format_version: save.format_version,
+        player_count: save.players.len(),
+        diagnostics: save.diagnostics,
+        warnings: save.warnings,
+        imported_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        nations,
+        clubs,
+        managed_club_id: save.managed_club_id,
+        ..source
+    };
     let players = save
         .players
         .into_iter()
@@ -86,8 +88,5 @@ pub fn build_snapshot(save: ParsedSave, mut source: Value) -> Result<NewSnapshot
             }
         })
         .collect();
-    Ok(NewSnapshot {
-        meta: source,
-        players,
-    })
+    NewSnapshot { meta, players }
 }

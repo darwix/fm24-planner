@@ -1,5 +1,4 @@
-use super::PlayerDetail;
-use serde_json::Value;
+use super::{PlayerDetail, SnapshotMeta};
 use std::collections::BTreeMap;
 
 /// A player ready to be stored, with every derived value already worked out.
@@ -30,6 +29,6 @@ pub struct PlayerRecord {
 
 /// An imported save ready to be stored.
 pub struct NewSnapshot {
-    pub meta: Value,
+    pub meta: SnapshotMeta,
     pub players: Vec<PlayerRecord>,
 }

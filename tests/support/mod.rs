@@ -125,13 +125,13 @@ pub fn write_archive(path: &Path, compressed: bool, members: Vec<(&str, Vec<u8>)
 pub fn create_snapshot(
     path: &Path,
     save: fm_savelens_backend::domain::entities::ParsedSave,
-    meta: serde_json::Value,
+    meta: fm_savelens_backend::domain::entities::SnapshotMeta,
     cancel: &tokio_util::sync::CancellationToken,
 ) -> fm_savelens_backend::Result<()> {
     use fm_savelens_backend::application::use_cases::build_snapshot;
     fm_savelens_backend::adapters::persistence::snapshot::create_snapshot(
         path,
-        &build_snapshot(save, meta)?,
+        &build_snapshot(save, meta),
         cancel,
     )
 }

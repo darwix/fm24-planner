@@ -8,6 +8,7 @@ pub mod player_view;
 pub mod save_file;
 pub mod settings;
 pub mod snapshot_id;
+pub mod snapshot_meta;
 pub mod source_file;
 
 pub use club::Club;
@@ -20,4 +21,5 @@ pub use player_view::{PlayerDetail, PlayerPage, PlayerSummary};
 pub use save_file::SaveFile;
 pub use settings::Settings;
 pub use snapshot_id::SnapshotId;
+pub use snapshot_meta::{NamedId, SnapshotMeta};
 pub use source_file::SourceFile;

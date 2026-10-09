@@ -57,6 +57,7 @@ Plain data and the rules that belong to it, with no framework or I/O.
 - `PlayerSummary`, `PlayerPage`, `PlayerDetail`: what a search or a player page returns.
 - `NewSnapshot`, `PlayerRecord`: an import ready to store, every derived value worked out.
 - `SnapshotId`: a 64-character hex digest, validated once when parsed.
+- `SnapshotMeta`: the summary stored with a snapshot (source file, game date, nations, clubs).
 - `Job`, `Settings`, `SaveFile`, `SourceFile`.
 
 ## Application

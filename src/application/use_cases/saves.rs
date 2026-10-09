@@ -3,12 +3,11 @@ use crate::{
         ports::{SaveFiles, SaveReader, SnapshotRepository},
         Session,
     },
-    domain::entities::{SaveFile, SnapshotId},
+    domain::entities::{SaveFile, SnapshotId, SnapshotMeta},
     utils::files::digest,
     Result,
 };
 use chrono::{DateTime, Utc};
-use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 
 pub struct SaveUseCase {
@@ -67,20 +66,16 @@ impl SaveUseCase {
     }
     /// An imported save's metadata, flagged stale when the source file or the
     /// parser changed since the import.
-    pub fn snapshot(&self, id: &str) -> Result<Value> {
+    pub fn snapshot(&self, id: &str) -> Result<SnapshotMeta> {
         let mut meta = self.snapshots.metadata(&SnapshotId::parse(id)?)?;
-        let stale = match self
-            .files
-            .stat(Path::new(meta["sourcePath"].as_str().unwrap_or("")))
-        {
+        meta.stale = match self.files.stat(Path::new(&meta.source_path)) {
             Ok(file) => {
-                file.size != meta["sourceSize"].as_u64().unwrap_or(0)
-                    || Some(file.mtime) != meta["sourceMtime"].as_f64()
-                    || meta["parserVersion"].as_str() != Some(self.reader.version())
+                file.size != meta.source_size
+                    || file.mtime != meta.source_mtime
+                    || meta.parser_version != self.reader.version()
             }
             Err(_) => true,
         };
-        meta["stale"] = json!(stale);
         Ok(meta)
     }
 }

@@ -48,7 +48,7 @@ fn snapshot() -> (tempfile::TempDir, Connection) {
         warnings: vec![],
     };
     let path = dir.path().join("snapshot.sqlite");
-    support::create_snapshot(&path, save, json!({}), &CancellationToken::new()).unwrap();
+    support::create_snapshot(&path, save, Default::default(), &CancellationToken::new()).unwrap();
     let db = snapshot::open_snapshot(&path).unwrap();
     (dir, db)
 }

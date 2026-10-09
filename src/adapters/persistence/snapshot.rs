@@ -2,13 +2,12 @@ use crate::{
     application::use_cases::ports::SnapshotRepository,
     domain::{
         catalog::CATALOG,
-        entities::{NewSnapshot, SnapshotId},
+        entities::{NewSnapshot, SnapshotId, SnapshotMeta},
     },
     utils::cancel::check,
     Error, Result,
 };
 use rusqlite::{params_from_iter, types::Value as SqlValue, Connection, OpenFlags};
-use serde_json::Value;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -137,7 +136,7 @@ pub fn open_snapshot(path: &Path) -> Result<Connection> {
         OpenFlags::SQLITE_OPEN_READ_ONLY,
     )?)
 }
-pub fn metadata(db: &Connection) -> Result<Value> {
+pub fn metadata(db: &Connection) -> Result<SnapshotMeta> {
     let raw: String = db.query_row("SELECT value FROM metadata WHERE key='snapshot'", [], |r| {
         r.get(0)
     })?;
@@ -193,7 +192,7 @@ impl SnapshotRepository for SqliteSnapshotRepository {
         }
         Ok(())
     }
-    fn metadata(&self, id: &SnapshotId) -> Result<Value> {
+    fn metadata(&self, id: &SnapshotId) -> Result<SnapshotMeta> {
         metadata(&open_snapshot(&snapshot_file(&self.dir, id)?)?)
     }
 }

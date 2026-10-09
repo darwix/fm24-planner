@@ -11,7 +11,7 @@ fn search_filters_contract_end_and_value_in_sql() {
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let dbpath = dir.path().join("s.sqlite");
-    support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
+    support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
     rusqlite::Connection::open(&dbpath)
         .unwrap()
         .execute_batch(
@@ -38,7 +38,7 @@ fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let dbpath = dir.path().join("t.sqlite");
-    support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
+    support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
     dbpath
 }
 

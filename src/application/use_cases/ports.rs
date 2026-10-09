@@ -1,11 +1,10 @@
 use crate::{
     domain::entities::{
         NewSnapshot, ParsedSave, PlayerDetail, PlayerFilter, PlayerPage, Settings, SnapshotId,
-        SourceFile,
+        SnapshotMeta, SourceFile,
     },
     Result,
 };
-use serde_json::Value;
 use std::path::Path;
 use tokio_util::sync::CancellationToken;
 
@@ -50,7 +49,7 @@ pub trait SnapshotRepository: Send + Sync {
     fn unpublish(&self, id: &SnapshotId) -> Result<()>;
     /// Drops the unpublished write of `job_id`, if any.
     fn discard(&self, job_id: &str) -> Result<()>;
-    fn metadata(&self, id: &SnapshotId) -> Result<Value>;
+    fn metadata(&self, id: &SnapshotId) -> Result<SnapshotMeta>;
 }
 
 /// Reads players from an imported snapshot.

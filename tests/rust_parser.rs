@@ -3,7 +3,10 @@ use fm_savelens_backend::{
     adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
     adapters::persistence::{snapshot, SqliteSnapshotRepository},
     application::use_cases::{build_snapshot, ports::SnapshotRepository},
-    domain::{catalog::CATALOG, entities::SnapshotId},
+    domain::{
+        catalog::CATALOG,
+        entities::{SnapshotId, SnapshotMeta},
+    },
 };
 use serde_json::json;
 use std::fs;
@@ -29,21 +32,21 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
     let repo = SqliteSnapshotRepository::new(snapshots.clone());
     let snapshot = build_snapshot(
         save,
-        json!({
-            "sourcePath": path,
-            "sourceSize": stat.len(),
-            "sourceMtime": source_mtime,
-            "parserVersion": PARSER_VERSION,
-        }),
-    )
-    .unwrap();
+        SnapshotMeta {
+            source_path: path.to_string_lossy().into_owned(),
+            source_size: stat.len(),
+            source_mtime,
+            parser_version: PARSER_VERSION.to_owned(),
+            ..Default::default()
+        },
+    );
     repo.create("job", &snapshot, &cancel).unwrap();
     repo.publish("job", &SnapshotId::parse(&id).unwrap())
         .unwrap();
     let saves = support::save_use_case(snapshots);
     let meta = saves.snapshot(&id).unwrap();
-    assert_eq!(meta["sourceMtime"].as_f64(), Some(source_mtime));
-    assert_eq!(meta["stale"], false, "{meta}");
+    assert_eq!(meta.source_mtime, source_mtime);
+    assert!(!meta.stale);
 
     // A timestamp-only change must still invalidate the snapshot at the same size.
     file.set_times(
@@ -51,7 +54,7 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
     )
     .unwrap();
     assert_eq!(file.metadata().unwrap().len(), stat.len());
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, true);
 }
 
 #[test]
@@ -87,7 +90,7 @@ fn compressed_and_plain_records_match_and_query_correctly() {
         assert_eq!(fs::read(&path).unwrap(), before);
         let dbpath = dir.path().join(format!("{compressed}.sqlite"));
         variants.push(serde_json::to_value(&save.players).unwrap());
-        support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
+        support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
         let db = snapshot::open_snapshot(&dbpath).unwrap();
         let first = support::search(
             &db,
@@ -171,21 +174,21 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
             .unwrap();
     }
     let saves = support::save_use_case(snapshots);
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, false);
     file.set_times(fs::FileTimes::new().set_modified(stamp + Duration::from_secs(1)))
         .unwrap();
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, true);
     file.set_times(fs::FileTimes::new().set_modified(stamp))
         .unwrap();
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, false);
     file.set_len(stat.len() + 1).unwrap();
     file.set_times(fs::FileTimes::new().set_modified(stamp))
         .unwrap();
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, true);
     file.set_len(stat.len()).unwrap();
     file.set_times(fs::FileTimes::new().set_modified(stamp))
         .unwrap();
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, false);
     let mut incompatible = metadata;
     incompatible["parserVersion"] = json!("old-parser");
     let writer = Connection::open(&dbpath).unwrap();
@@ -195,7 +198,7 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
             [incompatible.to_string()],
         )
         .unwrap();
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, true);
     writer
         .execute(
             "UPDATE metadata SET value=? WHERE key='snapshot'",
@@ -203,10 +206,10 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
         )
         .unwrap();
     drop(writer);
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], false);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, false);
     drop(file);
     fs::remove_file(&path).unwrap();
-    assert_eq!(saves.snapshot(&id).unwrap()["stale"], true);
+    assert_eq!(saves.snapshot(&id).unwrap().stale, true);
 }
 #[test]
 fn malformed_and_unsupported_archives_are_rejected() {
@@ -258,7 +261,7 @@ fn foreign_ability_ownership_is_excluded_and_sorting_is_directional() {
     assert!(!save.players.iter().any(|p| p.id == 1));
     assert_eq!(save.players.iter().find(|p| p.id == 2).unwrap().ca, 100);
     let dbpath = dir.path().join("snapshot.sqlite");
-    support::create_snapshot(&dbpath, save, json!({}), &cancel).unwrap();
+    support::create_snapshot(&dbpath, save, Default::default(), &cancel).unwrap();
     let db = snapshot::open_snapshot(&dbpath).unwrap();
     assert_eq!(
         support::search(&db, "sort=ca&direction=asc").unwrap()["players"][0]["id"],

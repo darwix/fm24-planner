@@ -1,5 +1,4 @@
 mod support;
-use fm_savelens_backend::infra;
 use serde_json::{json, Value};
 use std::{fs, time::Duration};
 async fn value(response: reqwest::Response) -> Value {
@@ -75,7 +74,7 @@ async fn shutdown_rejects_delayed_imports_including_cached_saves() {
         fs::create_dir(&games).unwrap();
         support::archive(&games.join("career.fm"), true, "24.3.0+0", 64);
         let data = dir.path().join("data");
-        let server = infra::setup::start(0, &data).await.unwrap();
+        let server = support::start(0, &data).await.unwrap();
         let url = server.url();
         let client = reqwest::Client::new();
         let save = select_save(&client, &url, &games).await;
@@ -141,7 +140,7 @@ async fn shutdown_rejects_delayed_imports_including_cached_saves() {
             );
         }
         // A surviving worker would retain the data-directory lock.
-        let reopened = infra::setup::start(0, &data).await.unwrap();
+        let reopened = support::start(0, &data).await.unwrap();
         let job = value(
             client
                 .post(format!("{}/api/imports", reopened.url()))
@@ -163,7 +162,7 @@ async fn shutdown_waits_for_active_import_cleanup_and_releases_data_directory() 
     fs::create_dir(&games).unwrap();
     support::archive(&games.join("career.fm"), false, "24.3.0+0", 50_000);
     let data = dir.path().join("data");
-    let server = infra::setup::start(0, &data).await.unwrap();
+    let server = support::start(0, &data).await.unwrap();
     let client = reqwest::Client::new();
     let save = select_save(&client, &server.url(), &games).await;
     let job = value(
@@ -181,7 +180,7 @@ async fn shutdown_waits_for_active_import_cleanup_and_releases_data_directory() 
         .unwrap()
         .unwrap();
     assert_eq!(fs::read_dir(data.join("snapshots")).unwrap().count(), 0);
-    let reopened = infra::setup::start(0, &data).await.unwrap();
+    let reopened = support::start(0, &data).await.unwrap();
     let settings = value(
         client
             .get(format!("{}/api/settings", reopened.url()))
@@ -201,9 +200,7 @@ async fn loopback_origins_allow_settings_and_imports_and_reject_foreign_requests
     let games = dir.path().join("games");
     fs::create_dir(&games).unwrap();
     support::archive(&games.join("career.fm"), true, "24.3.0+0", 64);
-    let server = infra::setup::start(0, &dir.path().join("data"))
-        .await
-        .unwrap();
+    let server = support::start(0, &dir.path().join("data")).await.unwrap();
     let port = server.address.port();
     let client = reqwest::Client::new();
     for host in ["127.0.0.1", "localhost"] {
@@ -301,7 +298,7 @@ async fn concurrent_import_cancellation_and_failure_leave_no_partial_snapshots()
     // Large enough for a second request to overlap parsing, without private data.
     support::archive(&games.join("career.fm"), false, "24.3.0+0", 50_000);
     let data = dir.path().join("data");
-    let server = infra::setup::start(0, &data).await.unwrap();
+    let server = support::start(0, &data).await.unwrap();
     let url = server.url();
     let client = reqwest::Client::new();
     value(
@@ -371,8 +368,8 @@ async fn api_import_security_and_shutdown() {
     fs::create_dir(&games).unwrap();
     let data = dir.path().join("data");
     support::archive(&games.join("career.fm"), true, "24.3.0+0", 64);
-    let server = infra::setup::start(0, &data).await.unwrap();
-    assert!(infra::setup::start(0, &data).await.is_err());
+    let server = support::start(0, &data).await.unwrap();
+    assert!(support::start(0, &data).await.is_err());
     let url = server.url();
     let client = reqwest::Client::new();
     assert_eq!(
@@ -526,7 +523,7 @@ async fn api_import_security_and_shutdown() {
         true
     );
     server.shutdown().await.unwrap();
-    let second = infra::setup::start(0, &data).await.unwrap();
+    let second = support::start(0, &data).await.unwrap();
     let settings = value(
         client
             .get(format!("{}/api/settings", second.url()))

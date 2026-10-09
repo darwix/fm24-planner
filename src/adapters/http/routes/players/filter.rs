@@ -160,16 +160,11 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
     Ok(filter)
 }
 
+/// A real date written exactly as `YYYY-MM-DD`; SQL compares contract ends as text, so the
+/// form must be canonical.
 fn is_iso_date(s: &str) -> bool {
-    let b = s.as_bytes();
-    b.len() == 10
-        && b.iter().enumerate().all(|(i, c)| {
-            if i == 4 || i == 7 {
-                *c == b'-'
-            } else {
-                c.is_ascii_digit()
-            }
-        })
+    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .is_ok_and(|d| d.format("%Y-%m-%d").to_string() == s)
 }
 
 /// Turns a JSON filter object into the query string the GET search takes.

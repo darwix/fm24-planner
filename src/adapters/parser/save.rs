@@ -2,6 +2,7 @@ use super::{
     archive::{check, Archive},
     contract, records,
 };
+use crate::utils::cancel::CancelFlag;
 use crate::{
     domain::{
         catalog::CATALOG,
@@ -16,7 +17,6 @@ use std::{
     path::Path,
     time::Instant,
 };
-use tokio_util::sync::CancellationToken;
 
 pub const PARSER_VERSION: &str = "fm24-rust-16-fm";
 pub(super) fn date_of(year: u16, day: u16) -> Result<String> {
@@ -28,7 +28,7 @@ pub(super) fn date_of(year: u16, day: u16) -> Result<String> {
 }
 pub fn parse_save(
     path: &Path,
-    cancel: &CancellationToken,
+    cancel: &CancelFlag,
     progress: impl Fn(u8, &str),
 ) -> Result<ParsedSave> {
     let start = Instant::now();

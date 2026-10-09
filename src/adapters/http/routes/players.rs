@@ -1,9 +1,9 @@
-use crate::{
-    adapters::http::{
-        app_state::Shared, dto::player_query::parse_filter, error::ApiError, json_body::JsonBody,
-        response::blocking,
-    },
-    utils::query::query_from_body,
+use crate::adapters::http::{
+    app_state::Shared,
+    dto::player_query::{parse_filter, query_from_body},
+    error::ApiError,
+    json_body::JsonBody,
+    response::blocking,
 };
 use axum::{
     extract::{Path, RawQuery, State},

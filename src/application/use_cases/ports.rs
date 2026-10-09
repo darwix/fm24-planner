@@ -1,3 +1,4 @@
+use crate::utils::cancel::CancelFlag;
 use crate::{
     domain::entities::{
         NewSnapshot, ParsedSave, PlayerDetail, PlayerFilter, PlayerPage, Settings, SnapshotId,
@@ -6,7 +7,6 @@ use crate::{
     Result,
 };
 use std::path::Path;
-use tokio_util::sync::CancellationToken;
 
 /// Reads a `.fm` save file into domain entities.
 pub trait SaveReader: Send + Sync {
@@ -15,7 +15,7 @@ pub trait SaveReader: Send + Sync {
     fn read(
         &self,
         path: &Path,
-        cancel: &CancellationToken,
+        cancel: &CancelFlag,
         progress: &dyn Fn(u8, &str),
     ) -> Result<ParsedSave>;
 }
@@ -39,12 +39,7 @@ pub trait SettingsRepository: Send + Sync {
 /// first and published under the snapshot id once it is complete.
 pub trait SnapshotRepository: Send + Sync {
     fn exists(&self, id: &SnapshotId) -> bool;
-    fn create(
-        &self,
-        job_id: &str,
-        snapshot: &NewSnapshot,
-        cancel: &CancellationToken,
-    ) -> Result<()>;
+    fn create(&self, job_id: &str, snapshot: &NewSnapshot, cancel: &CancelFlag) -> Result<()>;
     fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()>;
     fn unpublish(&self, id: &SnapshotId) -> Result<()>;
     /// Drops the unpublished write of `job_id`, if any.

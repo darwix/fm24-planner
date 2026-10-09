@@ -1,3 +1,4 @@
+use crate::utils::cancel::CancelFlag;
 use crate::{
     application::use_cases::{
         session::{Active, Completion},
@@ -14,7 +15,6 @@ use std::{
     sync::{Arc, Condvar, Mutex},
     time::Instant,
 };
-use tokio_util::sync::CancellationToken;
 
 impl SaveUseCase {
     pub fn start_import(self: &Arc<Self>, save_id: &str) -> Result<Job> {
@@ -71,7 +71,7 @@ impl SaveUseCase {
         } else {
             let active = Active {
                 id: id.clone(),
-                cancel: CancellationToken::new(),
+                cancel: CancelFlag::new(),
                 done: Arc::new((Mutex::new(false), Condvar::new())),
             };
             inner.active = Some(active.clone());

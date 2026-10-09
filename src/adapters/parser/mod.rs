@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod bytes;
 pub mod contract;
 pub mod reader;
 pub mod records;

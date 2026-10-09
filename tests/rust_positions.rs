@@ -1,4 +1,5 @@
 mod support;
+use fm_savelens_backend::utils::cancel::CancelFlag;
 use fm_savelens_backend::{
     adapters::persistence::snapshot,
     domain::{
@@ -8,7 +9,6 @@ use fm_savelens_backend::{
 };
 use rusqlite::Connection;
 use serde_json::{json, Value};
-use tokio_util::sync::CancellationToken;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/position-filters.json")).unwrap()
@@ -48,7 +48,7 @@ fn snapshot() -> (tempfile::TempDir, Connection) {
         warnings: vec![],
     };
     let path = dir.path().join("snapshot.sqlite");
-    support::create_snapshot(&path, save, Default::default(), &CancellationToken::new()).unwrap();
+    support::create_snapshot(&path, save, Default::default(), &CancelFlag::new()).unwrap();
     let db = snapshot::open_snapshot(&path).unwrap();
     (dir, db)
 }

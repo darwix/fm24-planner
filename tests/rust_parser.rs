@@ -1,4 +1,5 @@
 mod support;
+use fm_savelens_backend::utils::cancel::CancelFlag;
 use fm_savelens_backend::{
     adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
     adapters::persistence::{snapshot, SqliteSnapshotRepository},
@@ -10,7 +11,6 @@ use fm_savelens_backend::{
 };
 use serde_json::json;
 use std::fs;
-use tokio_util::sync::CancellationToken;
 
 #[test]
 fn snapshot_metadata_preserves_fractional_source_timestamps() {
@@ -24,7 +24,7 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
         .unwrap();
     let stat = file.metadata().unwrap();
     let source_mtime = fm_savelens_backend::utils::files::mtime(&stat).unwrap();
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let snapshots = dir.path().join("snapshots");
     fs::create_dir(&snapshots).unwrap();
@@ -60,7 +60,7 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
 #[test]
 fn compressed_and_plain_records_match_and_query_correctly() {
     let dir = tempfile::tempdir().unwrap();
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let mut variants = vec![];
     for compressed in [false, true] {
         let path = dir.path().join(format!("{compressed}.fm"));
@@ -214,7 +214,7 @@ fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
 #[test]
 fn malformed_and_unsupported_archives_are_rejected() {
     let dir = tempfile::tempdir().unwrap();
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let path = dir.path().join("bad.fm");
     for size in [0, 6, 25, 26, 100] {
         fs::write(&path, vec![0; size]).unwrap();
@@ -255,7 +255,7 @@ fn foreign_ability_ownership_is_excluded_and_sorting_is_directional() {
         false,
         vec![("game_info", info), ("game_db", database)],
     );
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     assert_eq!(save.players.len(), 63);
     assert!(!save.players.iter().any(|p| p.id == 1));
@@ -277,14 +277,14 @@ fn cancellation_and_changed_source_never_produce_success() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("save.fm");
     support::archive(&path, true, "24.3.0+0", 2000);
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let result = parse_save(&path, &cancel, |progress, _| {
         if progress >= 35 {
             cancel.cancel()
         }
     });
     assert_eq!(result.err().unwrap().code, "CANCELLED");
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let result = parse_save(&path, &cancel, |progress, _| {
         if progress == 52 {
             let file = fs::OpenOptions::new().write(true).open(&path).unwrap();

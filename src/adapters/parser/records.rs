@@ -1,9 +1,9 @@
 use super::archive::check;
+use crate::utils::cancel::CancelFlag;
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
-use tokio_util::sync::CancellationToken;
 
-pub use crate::utils::bytes::{u16, u32};
+pub use super::bytes::{u16, u32};
 fn text(b: &[u8]) -> Option<String> {
     let s = std::str::from_utf8(b).ok()?;
     if s.chars().any(|c| c <= '\u{1f}' || c == '\u{fffd}') {
@@ -12,7 +12,7 @@ fn text(b: &[u8]) -> Option<String> {
         Some(s.to_string())
     }
 }
-fn checkpoint(p: usize, c: &CancellationToken) -> Result<()> {
+fn checkpoint(p: usize, c: &CancelFlag) -> Result<()> {
     if p & 0xffff == 0 {
         check(c)?;
     }
@@ -26,11 +26,7 @@ pub struct Names {
     pub start: usize,
     pub end: usize,
 }
-fn pool(
-    b: &[u8],
-    start: usize,
-    cancel: &CancellationToken,
-) -> Result<Option<(Vec<String>, usize)>> {
+fn pool(b: &[u8], start: usize, cancel: &CancelFlag) -> Result<Option<(Vec<String>, usize)>> {
     if start + 16 >= b.len() {
         return Ok(None);
     }
@@ -59,7 +55,7 @@ fn pool(
     }
     Ok(Some((names, p)))
 }
-pub fn names(b: &[u8], cancel: &CancellationToken) -> Result<Names> {
+pub fn names(b: &[u8], cancel: &CancelFlag) -> Result<Names> {
     for p in 0..b.len().saturating_sub(40) {
         checkpoint(p, cancel)?;
         if b[p + 4..p + 8] != [0; 4] {
@@ -126,7 +122,7 @@ pub fn display_name(first: &str, last: &str, common: Option<&str>) -> String {
         _ => format!("{first} {last}").trim().to_string(),
     }
 }
-pub fn people(b: &[u8], names: &Names, cancel: &CancellationToken) -> Result<Vec<Person>> {
+pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person>> {
     let mut people = Vec::new();
     let mut p = names.end;
     while p < b.len().saturating_sub(100) {
@@ -316,7 +312,7 @@ pub struct Ability {
     pub positions: Vec<u8>,
     pub raw: Vec<u8>,
 }
-pub fn abilities(b: &[u8], start: usize, cancel: &CancellationToken) -> Result<Vec<Ability>> {
+pub fn abilities(b: &[u8], start: usize, cancel: &CancelFlag) -> Result<Vec<Ability>> {
     let mut blocks = vec![];
     let mut p = start + 57;
     while p < b.len().saturating_sub(54) {
@@ -356,7 +352,7 @@ pub fn abilities(b: &[u8], start: usize, cancel: &CancellationToken) -> Result<V
 }
 
 pub use crate::domain::entities::Club;
-pub fn clubs(b: &[u8], end: usize, cancel: &CancellationToken) -> Result<Vec<Club>> {
+pub fn clubs(b: &[u8], end: usize, cancel: &CancelFlag) -> Result<Vec<Club>> {
     let mut clubs = vec![];
     let mut p = 0;
     while p + 50 < end {
@@ -473,7 +469,7 @@ pub fn teams(
     clubs: &[Club],
     end: usize,
     valid: &HashSet<u32>,
-    cancel: &CancellationToken,
+    cancel: &CancelFlag,
 ) -> Result<Vec<Team>> {
     let club_map: HashMap<_, _> = clubs.iter().map(|c| (c.id, c)).collect();
     let mut heads = vec![];

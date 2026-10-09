@@ -1,3 +1,4 @@
+use crate::utils::cancel::CancelFlag;
 use crate::{
     application::use_cases::ports::SettingsRepository,
     domain::entities::{Job, Settings},
@@ -7,14 +8,13 @@ use std::{
     collections::BTreeMap,
     sync::{Arc, Condvar, Mutex},
 };
-use tokio_util::sync::CancellationToken;
 
 pub type Completion = Arc<(Mutex<bool>, Condvar)>;
 
 #[derive(Clone)]
 pub(super) struct Active {
     pub id: String,
-    pub cancel: CancellationToken,
+    pub cancel: CancelFlag,
     pub done: Completion,
 }
 pub(super) struct Inner {

@@ -1,3 +1,4 @@
+use crate::utils::cancel::CancelFlag;
 use crate::{
     application::use_cases::ports::SnapshotRepository,
     domain::{
@@ -17,7 +18,6 @@ use std::{
     },
     time::Duration,
 };
-use tokio_util::sync::CancellationToken;
 
 /// Columns before the per-attribute ones, in insert order.
 const PLAYER_COLUMNS: [&str; 19] = [
@@ -47,11 +47,7 @@ fn optional<T: Into<SqlValue>>(value: Option<T>) -> SqlValue {
     value.map_or(SqlValue::Null, Into::into)
 }
 
-pub fn create_snapshot(
-    path: &Path,
-    snapshot: &NewSnapshot,
-    cancel: &CancellationToken,
-) -> Result<()> {
+pub fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag) -> Result<()> {
     let mut db: Connection = Connection::open(path)?;
     let attributes: String = CATALOG
         .attributes
@@ -169,12 +165,7 @@ impl SnapshotRepository for SqliteSnapshotRepository {
     fn exists(&self, id: &SnapshotId) -> bool {
         snapshot_file(&self.dir, id).is_ok()
     }
-    fn create(
-        &self,
-        job_id: &str,
-        snapshot: &NewSnapshot,
-        cancel: &CancellationToken,
-    ) -> Result<()> {
+    fn create(&self, job_id: &str, snapshot: &NewSnapshot, cancel: &CancelFlag) -> Result<()> {
         create_snapshot(&self.partial(job_id), snapshot, cancel)
     }
     fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()> {

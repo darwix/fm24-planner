@@ -10,7 +10,7 @@ Dependencies only point inwards:
 infra ──▶ adapters ──▶ application ──▶ domain
 ```
 
-`domain` knows nothing about the other layers. `application` knows only `domain` and `utils`.
+`domain` knows nothing about the other layers. `application` knows only `domain`, `utils` and std.
 `adapters` implement the ports `application` declares. `infra` wires it all together.
 
 ## Layout
@@ -35,18 +35,19 @@ src/
 │       └── snapshot_builder.rs   derived columns and metadata of a snapshot
 ├── adapters/
 │   ├── http/               axum: routes, dto, error mapping, AppState
-│   ├── persistence/        SQLite snapshots, JSON settings, files on disk
-│   └── parser/             reads the .fm save format
+│   ├── persistence/        SQLite snapshots, JSON settings, files on disk, rusqlite/serde_json errors
+│   └── parser/             reads the .fm save format, little-endian byte readers
 ├── infra/
 │   ├── setup.rs            init_app_state: builds adapters and use cases
 │   ├── app.rs              router with the host and origin guard
 │   ├── data_dir.rs         data directory, instance lock, leftover cleanup
 │   └── config.rs           command-line arguments and defaults
-├── utils/                  small helpers shared by several layers
+├── utils/                  helpers used by more than one layer: cancel (CancelFlag), files, text
 └── assets/                 JSON catalogs (attributes, nations) embedded by domain
 ```
 
-`mod.rs` files hold only module declarations and re-exports.
+`mod.rs` files hold only module declarations and re-exports. A helper used by one layer lives in
+that layer, not in `utils/`.
 
 ## Domain
 
@@ -87,16 +88,18 @@ flag. The save and settings use cases share it behind an `Arc`.
 
 ### http
 
-- `routes/`: one file per resource, each with `routes() -> Router<Shared>`. Handlers are thin:
-  extract, call a use case inside `blocking`, return.
+- `routes/`: one file per resource, each with `routes() -> Router<Shared>`, merged in
+  `routes/router.rs`. Handlers are thin: extract, call a use case inside `blocking`, return.
 - `dto/`: request and response shapes, and `player_query::parse_filter`, which turns a search
-  query string into a `PlayerFilter`.
+  query string into a `PlayerFilter` (`query_from_body` turns the POST body into that string).
 - `error.rs`: `ApiError` maps the application `Error` to a status code and JSON body.
 - `app_state.rs`: `AppState` holds the three use cases, `Shared = Arc<AppState>`.
+- `response.rs`: `reply` (JSON with no-store headers) and `blocking` (runs a use case off the
+  async runtime). `json_body.rs`: `JsonBody`, a JSON extractor with API errors.
 
 ### persistence
 
-Plain lookups and writes, no decisions. Each repository opens its SQLite file per request
+Plain lookups and writes, no decisions. `error.rs` maps rusqlite and serde_json errors to `Error`. Each repository opens its SQLite file per request
 (read-only for reads); there is one file per imported save.
 
 - Searches translate a `PlayerFilter` into SQL.
@@ -135,5 +138,5 @@ GET /api/snapshots/{id}/players?caMin=150
 1. Add the entity or filter to `domain/entities` and export it from `mod.rs`.
 2. Add a use case method, and a port method if it needs new I/O.
 3. Implement the port in `adapters/persistence` (or `parser`).
-4. Add the route in `adapters/http/routes` and register it in `routes/mod.rs`.
+4. Add the route in `adapters/http/routes` and register it in `routes/router.rs`.
 5. Add a test in `tests/`, run `cargo test --release`.

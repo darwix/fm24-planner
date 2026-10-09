@@ -1,3 +1,4 @@
+use crate::utils::cancel::CancelFlag;
 use crate::{Error, Result};
 use std::{
     fs::File,
@@ -5,11 +6,10 @@ use std::{
     path::Path,
     time::SystemTime,
 };
-use tokio_util::sync::CancellationToken;
 
 pub use crate::utils::cancel::check;
 
-pub fn decompress(bytes: &[u8], limit: usize, cancel: &CancellationToken) -> Result<Vec<u8>> {
+pub fn decompress(bytes: &[u8], limit: usize, cancel: &CancelFlag) -> Result<Vec<u8>> {
     let mut decoder = zstd::stream::read::Decoder::new(bytes)
         .map_err(|_| Error::new("CORRUPT_COMPRESSION", "The save could not be decompressed."))?;
     let mut output = Vec::new();
@@ -81,7 +81,7 @@ pub struct Archive {
     pub members: Vec<Member>,
 }
 impl Archive {
-    pub fn open(path: &Path, cancel: &CancellationToken) -> Result<Self> {
+    pub fn open(path: &Path, cancel: &CancelFlag) -> Result<Self> {
         let file = File::open(path)?;
         let stat = file.metadata()?;
         let mut a = Self {
@@ -151,7 +151,7 @@ impl Archive {
         c: &mut Cursor<'_>,
         prefix: &str,
         start: u64,
-        cancel: &CancellationToken,
+        cancel: &CancelFlag,
     ) -> Result<()> {
         let count = c.u32()?;
         if count > 100000 {
@@ -202,7 +202,7 @@ impl Archive {
         }
         Ok(())
     }
-    fn read(&mut self, position: u64, length: u64, cancel: &CancellationToken) -> Result<Vec<u8>> {
+    fn read(&mut self, position: u64, length: u64, cancel: &CancelFlag) -> Result<Vec<u8>> {
         if position.checked_add(length).is_none_or(|v| v > self.size) {
             return Err(Error::new("TRUNCATED", "The save file is incomplete."));
         }
@@ -216,7 +216,7 @@ impl Archive {
         }
         Ok(b)
     }
-    pub fn member(&mut self, name: &str, cancel: &CancellationToken) -> Result<Vec<u8>> {
+    pub fn member(&mut self, name: &str, cancel: &CancelFlag) -> Result<Vec<u8>> {
         let m = self
             .members
             .iter()

@@ -1,12 +1,12 @@
 mod support;
 use fm_savelens_backend::adapters::{parser::parse_save, persistence::snapshot};
+use fm_savelens_backend::utils::cancel::CancelFlag;
 use serde_json::json;
-use tokio_util::sync::CancellationToken;
 
 #[test]
 fn search_filters_contract_end_and_value_in_sql() {
     let dir = tempfile::tempdir().unwrap();
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let path = dir.path().join("s.fm");
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
@@ -33,7 +33,7 @@ fn search_filters_contract_end_and_value_in_sql() {
 }
 
 fn snapshot(dir: &tempfile::TempDir) -> std::path::PathBuf {
-    let cancel = CancellationToken::new();
+    let cancel = CancelFlag::new();
     let path = dir.path().join("t.fm");
     support::archive(&path, false, "24.3.0+0", 64);
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
@@ -75,7 +75,7 @@ fn unknown_value_and_excluded_ids() {
 
 #[test]
 fn post_body_becomes_the_same_query_as_get() {
-    let q = fm_savelens_backend::utils::query::query_from_body(&json!({
+    let q = fm_savelens_backend::adapters::http::dto::player_query::query_from_body(&json!({
         "ageMin": 18, "mainPosition": [3, 12], "valueUnknown": true, "q": "a b", "skip": null,
     }));
     let pairs: std::collections::HashMap<_, _> = url::form_urlencoded::parse(q.as_bytes())

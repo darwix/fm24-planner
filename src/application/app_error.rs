@@ -20,9 +20,4 @@ impl From<std::io::Error> for Error {
         Self::new("IO", e.to_string())
     }
 }
-impl From<serde_json::Error> for Error {
-    fn from(e: serde_json::Error) -> Self {
-        Self::new("JSON", e.to_string())
-    }
-}
 pub type Result<T> = std::result::Result<T, Error>;

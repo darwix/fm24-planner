@@ -60,7 +60,7 @@ describe("toPool", () => {
 });
 
 describe("scoutQuery", () => {
-  const f = { pos: "", min: 18, max: 23, exp: false, val: "" as const };
+  const f = { pos: [] as string[], min: 18, max: 23, con: 0, val: "" as const };
   it("sends only age, sort and limit when no extra filters are on", () => {
     expect(scoutQuery(f, "2053-03-01")).toEqual({
       ageMin: 18,
@@ -69,10 +69,23 @@ describe("scoutQuery", () => {
       limit: 250,
     });
   });
-  it("sends position, expiry cutoff and max value to the backend", () => {
-    const q = scoutQuery({ ...f, pos: "ST", exp: true, val: 2 }, "2053-03-01");
-    expect(q.position).toBe(POS_INDEX.ST);
+  it("sends main positions as a comma list", () => {
+    const q = scoutQuery({ ...f, pos: ["ST", "DC"] }, "2053-03-01");
+    expect(q.mainPosition).toBe(`${POS_INDEX.ST},${POS_INDEX.DC}`);
+  });
+  it("sends the expiry cutoff for N months and max value", () => {
+    const q = scoutQuery({ ...f, con: 12, val: 2 }, "2053-03-01");
     expect(q.contractEndMax).toBe("2054-03-31");
     expect(q.valueMax).toBe(2_000_000);
+    expect(q.valueUnknown).toBeUndefined();
+    expect(scoutQuery({ ...f, con: 6 }, "2053-03-01").contractEndMax).toBe(
+      "2053-09-30",
+    );
+  });
+  it("expired means free agents, and a price keeps unknown values", () => {
+    const q = scoutQuery({ ...f, con: -1, val: 5 }, "2053-03-01");
+    expect(q.club).toBe(-1);
+    expect(q.contractEndMax).toBeUndefined();
+    expect(q.valueUnknown).toBe(1);
   });
 });

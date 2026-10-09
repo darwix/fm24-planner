@@ -88,10 +88,11 @@ flag. The save and settings use cases share it behind an `Arc`.
 
 ### http
 
-- `routes/`: one file per resource, each with `routes() -> Router<Shared>`, merged in
+- `routes/`: one module per resource, each with `routes() -> Router<Shared>`, merged in
   `routes/router.rs`. Handlers are thin: extract, call a use case inside `blocking`, return.
-- `dto/`: request and response shapes, and `player_query::parse_filter`, which turns a search
-  query string into a `PlayerFilter` (`query_from_body` turns the POST body into that string).
+  Parsing that only one resource needs sits beside it: `routes/players/filter.rs` turns a
+  search query string or JSON body into a `PlayerFilter`.
+- `dto/`: request and response shapes only.
 - `error.rs`: `ApiError` maps the application `Error` to a status code and JSON body.
 - `app_state.rs`: `AppState` holds the three use cases, `Shared = Arc<AppState>`.
 - `response.rs`: `reply` (JSON with no-store headers) and `blocking` (runs a use case off the
@@ -135,7 +136,7 @@ reuses the cached snapshot.
 ```
 GET /api/snapshots/{id}/players?caMin=150
   routes::players::search_players     extract path and query
-  dto::player_query::parse_filter     query string -> PlayerFilter (validation)
+  players::filter::parse_filter      query string -> PlayerFilter (validation)
   PlayerUseCase::search_players       SnapshotId::parse, call the port
   SqlitePlayerRepository::search      PlayerFilter -> SQL -> PlayerPage
   reply                               JSON with no-store headers

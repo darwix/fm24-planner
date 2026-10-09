@@ -1,3 +1,4 @@
+//! Turns a player search request (query string or JSON body) into a validated `PlayerFilter`.
 use crate::{
     domain::text::normalize,
     domain::{

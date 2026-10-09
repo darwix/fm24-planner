@@ -141,7 +141,7 @@ pub fn search(
     db: &rusqlite::Connection,
     query: &str,
 ) -> fm_savelens_backend::Result<serde_json::Value> {
-    use fm_savelens_backend::adapters::http::dto::player_query::parse_filter;
+    use fm_savelens_backend::adapters::http::routes::players::filter::parse_filter;
     let page =
         fm_savelens_backend::adapters::persistence::player::search(db, &parse_filter(query)?)?;
     Ok(serde_json::to_value(page)?)

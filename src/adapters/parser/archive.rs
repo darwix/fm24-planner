@@ -10,6 +10,7 @@ use std::{
 pub use crate::utils::cancel::check;
 
 /// Archive header: `[magic x6][version] .. [index offset u64 at 9] .. [compression at 25]`.
+/// Each member's data follows a header of the same size.
 const HEADER: u64 = 26;
 const MAGIC: &[u8] = b"\x02\x01fmf.";
 const VERSION: usize = 6;
@@ -18,8 +19,10 @@ const COMPRESSION: usize = 25;
 /// The index starts with the archive magic and version, then a zstd frame.
 const INDEX_MAGIC: &[u8] = b"\x02\x01fmf.\x08\0\0";
 const ZSTD_MAGIC: &[u8] = b"\x28\xb5\x2f\xfd";
-/// Each member's data follows a header the size of the archive header.
-const MEMBER_HEADER: u64 = HEADER;
+
+fn manifest(message: &str) -> Error {
+    Error::new("INVALID_MANIFEST", message)
+}
 
 pub fn decompress(bytes: &[u8], limit: usize, cancel: &CancelFlag) -> Result<Vec<u8>> {
     let mut decoder = zstd::stream::read::Decoder::new(bytes)
@@ -69,10 +72,7 @@ impl<'a> Cursor<'a> {
     fn text(&mut self) -> Result<String> {
         let n = self.u32()? as usize;
         if n > 16384 {
-            return Err(Error::new(
-                "INVALID_MANIFEST",
-                "An archive name has an invalid length.",
-            ));
+            return Err(manifest("An archive name has an invalid length."));
         }
         Ok(String::from_utf8_lossy(self.take(n)?).into_owned())
     }
@@ -104,7 +104,20 @@ impl Archive {
             name: String::new(),
             members: vec![],
         };
-        let h = a.read(0, HEADER, cancel)?;
+        let index_start = a.read_header(cancel)?;
+        let index = a.read_index(index_start, cancel)?;
+        a.read_members(&index, index_start, cancel)?;
+        if !a.members.iter().any(|m| m.name == "game_db.dat") {
+            return Err(Error::new(
+                "MISSING_DATABASE",
+                "The save does not contain a player database.",
+            ));
+        }
+        Ok(a)
+    }
+    /// Checks the archive header, notes the compression and returns where the index starts.
+    fn read_header(&mut self, cancel: &CancelFlag) -> Result<u64> {
+        let h = self.read(0, HEADER, cancel)?;
         if &h[..MAGIC.len()] != MAGIC || h[VERSION] != 8 {
             return Err(Error::new(
                 "UNSUPPORTED_FORMAT",
@@ -117,53 +130,46 @@ impl Archive {
                 "This save uses an unsupported compression method.",
             ));
         }
-        a.compressed = h[COMPRESSION] == 3;
+        self.compressed = h[COMPRESSION] == 3;
         // The stored index offset counts from the offset field itself.
-        let start = u64::from_le_bytes(h[INDEX_OFFSET].try_into().unwrap())
+        u64::from_le_bytes(h[INDEX_OFFSET].try_into().unwrap())
             .checked_add(INDEX_OFFSET.start as u64)
-            .ok_or_else(|| Error::new("INVALID_SIZE", "Invalid archive index offset."))?;
-        let index_data = INDEX_MAGIC.len() as u64;
-        let header = a.read(start, index_data + ZSTD_MAGIC.len() as u64, cancel)?;
+            .ok_or_else(|| Error::new("INVALID_SIZE", "Invalid archive index offset."))
+    }
+    /// The decompressed index: everything from `start` to the end of the file.
+    fn read_index(&mut self, start: u64, cancel: &CancelFlag) -> Result<Vec<u8>> {
+        let magic = INDEX_MAGIC.len() as u64;
+        let header = self.read(start, magic + ZSTD_MAGIC.len() as u64, cancel)?;
         if &header[..INDEX_MAGIC.len()] != INDEX_MAGIC || &header[INDEX_MAGIC.len()..] != ZSTD_MAGIC
         {
-            return Err(Error::new(
-                "INVALID_MANIFEST",
+            return Err(manifest(
                 "The save index is missing or incomplete. Try a completed backup save.",
             ));
         }
-        let tail = a.size - start - index_data;
-        if tail > 32 * 1024 * 1024 {
-            return Err(Error::new(
-                "INVALID_MANIFEST",
-                "The save index exceeds the supported size.",
-            ));
+        let length = self.size - start - magic;
+        if length > 32 * 1024 * 1024 {
+            return Err(manifest("The save index exceeds the supported size."));
         }
-        let bytes = decompress(
-            &a.read(start + index_data, tail, cancel)?,
-            64 * 1024 * 1024,
-            cancel,
-        )?;
+        let compressed = self.read(start + magic, length, cancel)?;
+        decompress(&compressed, 64 * 1024 * 1024, cancel)
+    }
+    /// Reads the archive name and member list: the root group, then named groups.
+    fn read_members(&mut self, index: &[u8], index_start: u64, cancel: &CancelFlag) -> Result<()> {
         let mut c = Cursor {
-            bytes: &bytes,
+            bytes: index,
             pos: 0,
         };
-        a.name = c.text()?;
-        a.group(&mut c, "", start, cancel)?;
+        self.name = c.text()?;
+        self.group(&mut c, "", index_start, cancel)?;
         let groups = c.u32()?;
         if groups > 10000 {
-            return Err(Error::new("INVALID_MANIFEST", "Invalid archive groups."));
+            return Err(manifest("Invalid archive groups."));
         }
         for _ in 0..groups {
             let prefix = c.text()? + "/";
-            a.group(&mut c, &prefix, start, cancel)?;
+            self.group(&mut c, &prefix, index_start, cancel)?;
         }
-        if !a.members.iter().any(|m| m.name == "game_db.dat") {
-            return Err(Error::new(
-                "MISSING_DATABASE",
-                "The save does not contain a player database.",
-            ));
-        }
-        Ok(a)
+        Ok(())
     }
     fn group(
         &mut self,
@@ -174,10 +180,7 @@ impl Archive {
     ) -> Result<()> {
         let count = c.u32()?;
         if count > 100000 {
-            return Err(Error::new(
-                "INVALID_MANIFEST",
-                "Invalid number of archive members.",
-            ));
+            return Err(manifest("Invalid number of archive members."));
         }
         for _ in 0..count {
             check(cancel)?;
@@ -192,10 +195,7 @@ impl Archive {
                 }
             }
             if !complete {
-                return Err(Error::new(
-                    "INVALID_MANIFEST",
-                    "Invalid archive member name.",
-                ));
+                return Err(manifest("Invalid archive member name."));
             }
             let offset = c.u64()?;
             let stored = c.u64()?;
@@ -203,7 +203,7 @@ impl Archive {
             c.take(16)?;
             if offset
                 .checked_add(stored)
-                .and_then(|v| v.checked_add(MEMBER_HEADER))
+                .and_then(|v| v.checked_add(HEADER))
                 .is_none_or(|v| v > start)
                 || plain > 2 * 1024u64.pow(3)
             {
@@ -242,7 +242,7 @@ impl Archive {
             .find(|m| m.name == name)
             .ok_or_else(|| Error::new("MISSING_MEMBER", format!("The save is missing {name}.")))?;
         let (offset, stored, plain) = (m.offset, m.stored, m.plain);
-        let bytes = self.read(offset + MEMBER_HEADER, stored, cancel)?;
+        let bytes = self.read(offset + HEADER, stored, cancel)?;
         let bytes = if self.compressed {
             decompress(&bytes, plain as usize, cancel)?
         } else {

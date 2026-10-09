@@ -83,7 +83,13 @@ function Face({ p, drag = 0 }: { p: PoolPlayer; drag?: number }) {
         </div>
         <div>
           <span className="lbl">Contract</span>
-          <b>{p.left === undefined ? "n/a" : `${p.left} months`}</b>
+          <b>
+            {p.left === undefined
+              ? "n/a"
+              : p.left === 0
+                ? "Expired"
+                : `${p.left} months`}
+          </b>
         </div>
         <div>
           <span className="lbl">Value</span>

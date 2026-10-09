@@ -178,7 +178,11 @@ export default function Scouting() {
                         : undefined
                     }
                   >
-                    {p.left === undefined ? "n/a" : `${p.left} months`}
+                    {p.left === undefined
+                      ? "n/a"
+                      : p.left === 0
+                        ? "Expired"
+                        : `${p.left} months`}
                   </td>
                   <td className="r">{money(p.v)}</td>
                   <td className="r">{wage(p.w)}</td>

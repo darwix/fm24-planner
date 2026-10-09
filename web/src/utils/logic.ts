@@ -38,4 +38,10 @@ export const asCandidate = (
 };
 
 export const contractLabel = (left?: number, end?: number) =>
-  left === undefined ? "n/a" : left <= 12 ? `${left} months left` : `to ${end}`;
+  left === undefined
+    ? "n/a"
+    : left === 0
+      ? "Expired"
+      : left <= 12
+        ? `${left} months left`
+        : `to ${end}`;

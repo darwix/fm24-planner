@@ -62,7 +62,8 @@ export const toPool = (p: ApiPlayer, gameDate: string): PoolPlayer => ({
   ca: p.ca,
   pa: p.pa,
   c: p.contractEnd ? Number(p.contractEnd.slice(0, 4)) : undefined,
-  left: monthsLeft(p.contractEnd, gameDate),
+  // no club and no contract = free agent
+  left: !p.club && !p.contractEnd ? 0 : monthsLeft(p.contractEnd, gameDate),
   v: p.value ? Math.round(p.value / 1e5) / 10 : undefined,
   w: p.wage ? Math.round(p.wage / 1000) : undefined,
 });

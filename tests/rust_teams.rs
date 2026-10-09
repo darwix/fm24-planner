@@ -58,3 +58,26 @@ fn reserve_team_links_to_club_before_owner() {
     let got = run(&b, &[club(225, "Sparta Prague")]);
     assert_eq!(got, vec![(Some(225), 500, vec![1, 2])]);
 }
+
+// Under-20 team of a big club (owner id <= 256): flag 20 means the club is owner - 1.
+#[test]
+fn flag_20_team_with_small_owner_links_to_club_before_owner() {
+    let mut b = vec![0u8; 100];
+    b.extend([0x01, 0x64, 0xff, 0x14]);
+    b.extend(18u32.to_le_bytes());
+    b.extend([0u8; 10]);
+    b.extend(500u32.to_le_bytes());
+    b.extend(7u32.to_le_bytes());
+    b.extend(7u32.to_le_bytes());
+    b.push(10);
+    b.extend([0u8; 4]);
+    b.extend([0xff; 4]);
+    b.extend(2u16.to_le_bytes());
+    for id in [1u32, 2] {
+        b.extend(id.to_le_bytes());
+    }
+    b.extend([0xff; 8]);
+    b.extend([0u8; 100]);
+    let got = run(&b, &[club(17, "Huracan"), club(18, "Independiente")]);
+    assert_eq!(got, vec![(Some(17), 500, vec![1, 2])]);
+}

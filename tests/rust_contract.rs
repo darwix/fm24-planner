@@ -89,3 +89,14 @@ fn soldi_ignores_overlapping_false_expiry() {
         "2057-06-30",
     );
 }
+
+// Planchart: an extra u32 sits before the FF run, and a false match one field later has start 2100 > end 2050.
+#[test]
+fn planchart_extra_field_before_ff_run() {
+    check(
+        include_str!("fixtures/planchart.hex"),
+        381134,
+        8_238,
+        "2054-06-30",
+    );
+}

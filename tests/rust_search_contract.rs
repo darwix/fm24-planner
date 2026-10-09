@@ -97,3 +97,20 @@ fn zero_value_in_the_save_is_stored_as_unknown() {
     assert_eq!(total("valueMax=5000000"), 0);
     assert_eq!(total("valueMax=5000000&valueUnknown=1"), 64);
 }
+
+#[test]
+fn no_contract_keeps_only_players_without_a_contract_end() {
+    let dir = tempfile::tempdir().unwrap();
+    let dbpath = snapshot(&dir);
+    rusqlite::Connection::open(&dbpath)
+        .unwrap()
+        .execute_batch(
+            "UPDATE players SET contract_end=NULL;
+         UPDATE players SET contract_end='2056-06-30' WHERE id=3;",
+        )
+        .unwrap();
+    let db = storage::open_snapshot(&dbpath).unwrap();
+    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("noContract=1"), 63);
+    assert_eq!(total(""), 64);
+}

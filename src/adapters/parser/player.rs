@@ -4,7 +4,7 @@ use super::{
     meta::date_of,
     records::{
         abilities::{Ability, Linked},
-        contract::{self, Contract},
+        contract::Contract,
         people::Person,
         teams::{self, Team},
     },
@@ -21,7 +21,6 @@ use std::collections::{BTreeMap, HashMap};
 
 /// One `Player` per linked pair, `contracts` in the same order as the pairs.
 pub fn build_all(
-    db: &[u8],
     linked: &Linked,
     contracts: Vec<Contract>,
     teams: &[Team],
@@ -45,13 +44,12 @@ pub fn build_all(
         .map(|((&(person, ability), contract), club_id)| {
             let club = club_id.and_then(|id| club_map.get(&id).map(|c| c.short_name.clone()));
             let age = |birth_date: &str| age(year, game_date, person.birth_year, birth_date);
-            build(db, person, ability, contract, club_id, club, age)
+            build(person, ability, contract, club_id, club, age)
         })
         .collect()
 }
 
 fn build(
-    db: &[u8],
     person: &Person,
     ability: &Ability,
     contract: Contract,
@@ -81,7 +79,7 @@ fn build(
         raw_attributes: raw,
         wage: contract.wage,
         contract_end: contract.contract_end,
-        value: contract::value(db, ability.offset),
+        value: contract.value,
         source: json!({
             "person": person.offset,
             "ability": ability.offset,

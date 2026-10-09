@@ -44,7 +44,7 @@ pub struct Evidence {
 }
 
 pub static EVIDENCE: LazyLock<Evidence> = LazyLock::new(|| {
-    let evidence: Evidence = serde_json::from_str(include_str!("assets/fm_arena_evidence.json"))
+    let evidence: Evidence = serde_json::from_str(include_str!("../assets/fm_arena_evidence.json"))
         .expect("FM-Arena evidence dataset");
     assert_eq!(evidence.schema_version, 1);
     for (key, experiment) in evidence

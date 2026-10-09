@@ -48,7 +48,7 @@ fn catalog_is_complete_and_rejects_invalid_definitions() {
     assert!(roles::find("lib-attack").is_err());
     assert!(roles::find("fb-automatic").is_err());
     let fresh = || {
-        serde_json::from_str::<RoleCatalog>(include_str!("../native/assets/roles.json")).unwrap()
+        serde_json::from_str::<RoleCatalog>(include_str!("../src/assets/roles.json")).unwrap()
     };
     let mut catalog = fresh();
     catalog.roles[0]

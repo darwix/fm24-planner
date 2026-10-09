@@ -13,11 +13,11 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 
 ## Status: React app on a patched SaveLens backend (real wage, contract end, value)
 
-**Layout**: the repo root is the SaveLens clone (Rust in `native/`, `tests/`; no desktop app, browser only), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; Vite builds to `web/dist/client`, which the Rust server embeds). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
+**Layout**: the repo root is the SaveLens clone (Rust in `src/` (`domain/`, `adapters/` = parser + storage, `services/`, `error.rs`), `tests/`; no desktop app, browser only), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; Vite builds to `web/dist/client`, which the Rust server embeds). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
 
 `web/src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to a SaveLens server on :4242.
 
-The shipped SaveLens exe does not expose contract data, so the SaveLens clone (now the repo root) is patched: `native/parser/contract.rs` reads weekly wage (GBP, before tax), contract end and value (GBP) from the save; the search API returns `wage`, `contractEnd`, `value`. Build and run it instead of the shipped exe: `cargo build --release --bin fm-savelens-24-server` (from the root), then `target/release/fm-savelens-24-server.exe --no-open --port 4242`. Tests: `cargo test --release` (fixtures in `tests/fixtures`, real bytes of four players). Layout notes: wage = u32 after `[eid][team][00 x4]`, contract end = `(day,year)` 12 bytes after the u32 before an `FF FF FF FF` run, value = u32 right after the 54-byte attribute block. Not decoded: transfer-listed, loan-listed, sales value. Coverage is high for top players and thin for low-rated or unsigned ones.
+The shipped SaveLens exe does not expose contract data, so the SaveLens clone (now the repo root) is patched: `src/adapters/parser/contract.rs` reads weekly wage (GBP, before tax), contract end and value (GBP) from the save; the search API returns `wage`, `contractEnd`, `value`. Build and run it instead of the shipped exe: `cargo build --release --bin fm-savelens-24-server` (from the root), then `target/release/fm-savelens-24-server.exe --no-open --port 4242`. Tests: `cargo test --release` (fixtures in `tests/fixtures`, real bytes of four players). Layout notes: wage = u32 after `[eid][team][00 x4]`, contract end = `(day,year)` 12 bytes after the u32 before an `FF FF FF FF` run, value = u32 right after the 54-byte attribute block. Not decoded: transfer-listed, loan-listed, sales value. Coverage is high for top players and thin for low-rated or unsigned ones.
 
 Frontend: save list, import, club squad, player page, shortlist (CA match, tags contract expiring <=12 months and cheap <=GBP 5M) and scouting all use live backend queries (top 250 per query; expiry and value filter client-side). Positions use the backend's labels (AMC, not AM). Money shows in GBP. Run (in `web/`): `npm run dev`, `npm test`, `npm run typecheck`.
 
@@ -65,7 +65,7 @@ Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` 
 ## Gotchas
 
 - `agent-browser open` with only a hash change does not reload; use `agent-browser reload`.
-- Stop the SaveLens server before `cargo build` (Windows locks the exe). Bump `PARSER_VERSION` in `native/parser/mod.rs` when parser output changes, or re-import reuses the cached snapshot.
+- Stop the SaveLens server before `cargo build` (Windows locks the exe). Bump `PARSER_VERSION` in `src/adapters/parser/mod.rs` when parser output changes, or re-import reuses the cached snapshot.
 - `agent-browser` is headless by default; use `--headed` to watch. Element refs change after each click, so re-snapshot first.
 - Vitest: a `beforeEach` that returns a mock runs it as a cleanup hook; use braces. `src/services/save.test.ts` holds the API client tests, so new service tests go in their own file.
 - CSS class `.up` is the delta colour in `a-board.html`; do not reuse it for layout.

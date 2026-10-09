@@ -18,7 +18,7 @@ use search_cache::OrderCache;
 pub use search_cache::SearchSession;
 
 static COUNTRIES: LazyLock<HashMap<String, String>> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("assets/nations.json")).expect("country catalog")
+    serde_json::from_str(include_str!("../../assets/nations.json")).expect("country catalog")
 });
 pub fn nation_name(id: u32) -> String {
     COUNTRIES

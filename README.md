@@ -35,6 +35,6 @@ A pre-commit hook runs Prettier on `web/`, and the PR workflow checks format, te
 ## Layout
 
 - `web/`: React 18 + TypeScript app (react-router, recoil, swr, axios). Builds to `web/dist/client`, which the server embeds.
-- `native/`: Rust parser and API server (`native/parser/contract.rs` reads wage, contract end and value).
+- `src/`: Rust parser and API server (`src/adapters/parser/contract.rs` reads wage, contract end and value).
 - `mock/`: the chosen HTML design (`a-board.html`).
 - `CLAUDE.md`: project notes and decisions.

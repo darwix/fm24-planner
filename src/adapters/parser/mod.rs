@@ -30,7 +30,7 @@ pub struct Catalog {
     pub positions: Vec<String>,
 }
 pub static CATALOG: LazyLock<Catalog> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../assets/attributes.json")).expect("attribute catalog")
+    serde_json::from_str(include_str!("../../assets/attributes.json")).expect("attribute catalog")
 });
 
 #[derive(Serialize, Deserialize)]

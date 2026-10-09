@@ -6,11 +6,11 @@ publish = false
 description = "Read-only Football Manager 2024 save database"
 
 [lib]
-path = "native/lib.rs"
+path = "src/lib.rs"
 
 [[bin]]
 name = "fm-savelens-24-server"
-path = "native/main.rs"
+path = "src/main.rs"
 
 [dependencies]
 axum = "0.8"

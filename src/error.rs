@@ -1,13 +1,3 @@
-pub mod hybrid;
-pub mod parser;
-pub mod rating_systems;
-pub mod roles;
-pub mod service;
-pub mod storage;
-
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const APP_ID: &str = "io.github.MSalman5230.FMSaveLens24";
-
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
 pub struct Error {

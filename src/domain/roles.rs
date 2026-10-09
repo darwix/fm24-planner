@@ -60,7 +60,7 @@ pub struct RatingComponents {
 
 pub static ROLES: LazyLock<RoleCatalog> = LazyLock::new(|| {
     let catalog: RoleCatalog =
-        serde_json::from_str(include_str!("assets/roles.json")).expect("role catalog");
+        serde_json::from_str(include_str!("../assets/roles.json")).expect("role catalog");
     validate(&catalog).expect("valid role catalog");
     catalog
 });

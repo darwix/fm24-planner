@@ -100,3 +100,14 @@ fn planchart_extra_field_before_ff_run() {
         "2054-06-30",
     );
 }
+
+// Dawson: the false match sits 4 bytes after the real one (start 2032 reads as a year); the earlier one wins.
+#[test]
+fn dawson_prefers_the_earlier_of_two_overlapping_matches() {
+    check(
+        include_str!("fixtures/dawson.hex"),
+        550711,
+        21_890,
+        "2056-06-30",
+    );
+}

@@ -12,7 +12,7 @@ pub mod snapshot_meta;
 pub mod source_file;
 
 pub use club::Club;
-pub use job::Job;
+pub use job::{Job, JobStatus};
 pub use new_snapshot::{NewSnapshot, PlayerRecord};
 pub use parsed_save::ParsedSave;
 pub use player::Player;

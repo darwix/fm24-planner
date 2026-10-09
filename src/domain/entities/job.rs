@@ -7,7 +7,7 @@ pub struct Job {
     pub id: String,
     pub save_id: String,
     pub snapshot_id: String,
-    pub status: String,
+    pub status: JobStatus,
     pub progress: u8,
     pub message: String,
     pub started_at: String,
@@ -15,4 +15,14 @@ pub struct Job {
     pub player_count: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub elapsed_ms: Option<u128>,
+}
+
+/// Where an import run is. Serialized in lowercase, as the API reports it.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JobStatus {
+    Running,
+    Complete,
+    Cancelled,
+    Error,
 }

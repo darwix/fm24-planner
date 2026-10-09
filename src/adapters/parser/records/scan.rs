@@ -1,6 +1,6 @@
 //! Helpers every record scan shares. The save has no index for its records, so each scan
 //! slides over the database one byte at a time and asks whether a record starts there.
-use super::archive::check;
+use crate::utils::cancel::check;
 use crate::{utils::cancel::CancelFlag, Result};
 
 /// Slides over `from..to`. `read(offset)` says whether a record starts at `offset` and where

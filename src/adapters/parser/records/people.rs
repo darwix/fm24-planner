@@ -9,12 +9,15 @@
 //! The person record holds no id. Ids come from identity records further on: the longest
 //! ascending chain of them is taken, and each person gets the first identity after it.
 use super::{
-    archive::check,
-    bytes::{u16, u32},
+    super::bytes::{u16, u32},
     names::Names,
     scan::{checkpoint, is_set, scan, text},
 };
-use crate::{utils::cancel::CancelFlag, Error, Result};
+use crate::{
+    utils::cancel::{check, CancelFlag},
+    Error, Result,
+};
+use std::collections::HashSet;
 
 pub struct Person {
     pub offset: usize,
@@ -295,4 +298,13 @@ fn other_nations(db: &[u8], person: &Person, limit: usize) -> Vec<u32> {
         }
     }
     nations
+}
+
+/// Ids of the people an identity was found for.
+pub fn ids(people: &[Person]) -> HashSet<u32> {
+    people
+        .iter()
+        .filter(|p| p.id >= 0)
+        .map(|p| p.id as u32)
+        .collect()
 }

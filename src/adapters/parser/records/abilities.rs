@@ -6,7 +6,8 @@
 //! ```
 //! A block is read from its attributes, the part that is easiest to recognise.
 use super::{
-    bytes::u32,
+    super::bytes::u32,
+    people::Person,
     scan::{is_set, scan},
 };
 use crate::{utils::cancel::CancelFlag, Result};
@@ -58,4 +59,50 @@ pub fn find(db: &[u8], start: usize, cancel: &CancelFlag) -> Result<Vec<Ability>
     scan(start + Ability::BEFORE, to, cancel, |offset| {
         Ability::read(db, offset).map(|block| (block, offset + Ability::ATTRIBUTES))
     })
+}
+
+/// People paired with their ability block, and how many could not be paired.
+pub struct Linked<'a> {
+    pub pairs: Vec<(&'a Person, &'a Ability)>,
+    /// People with more than one ability block before them.
+    pub ambiguous: usize,
+    /// People whose one ability block belongs to someone else.
+    pub unbound: usize,
+}
+impl Linked<'_> {
+    pub fn warnings(&self) -> Vec<String> {
+        let excluded = self.ambiguous + self.unbound;
+        if excluded == 0 {
+            return vec![];
+        }
+        vec![format!(
+            "{excluded} ambiguous player records were excluded rather than assigned uncertain ratings."
+        )]
+    }
+}
+
+/// Pairs each person with the single ability block between the previous person and them,
+/// if that block names them as its owner.
+pub fn link<'a>(people: &'a [Person], abilities: &'a [Ability]) -> Linked<'a> {
+    let mut linked = Linked {
+        pairs: vec![],
+        ambiguous: 0,
+        unbound: 0,
+    };
+    let mut ix = 0;
+    for person in people {
+        let first = ix;
+        while ix < abilities.len() && abilities[ix].offset < person.offset {
+            ix += 1;
+        }
+        match ix - first {
+            0 => {}
+            1 if person.id >= 0 && abilities[first].person_id == person.id as u64 => {
+                linked.pairs.push((person, &abilities[first]))
+            }
+            1 => linked.unbound += 1,
+            _ => linked.ambiguous += 1,
+        }
+    }
+    linked
 }

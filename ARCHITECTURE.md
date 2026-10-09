@@ -108,10 +108,16 @@ Plain lookups and writes, no decisions. `error.rs` maps rusqlite and serde_json 
 
 ### parser
 
-Reads the `.fm` archive: `archive` (container and compression), then one module per record in
-`game_db.dat`: `names` (name pools), `people`, `abilities`, `clubs`, `teams`, plus `contract`
-(wage, contract end, value). `scan` holds the byte-by-byte scan they share; `save` (`parse_save`)
-ties them together. Each module starts with its byte layout.
+Reads the `.fm` save. `save::parse_save` only orchestrates; each step has its own module:
+
+- `archive`: the container (header, zstd index, members).
+- `meta`: version check, in-game date, managed club from the save summary.
+- `records/`: raw records in `game_db.dat`, one module per kind, each opening with its byte
+  layout: `names`, `people`, `abilities` (and linking them to people), `clubs`, `teams`,
+  `contract`. `scan` holds the byte-by-byte scan they share.
+- `player`: each player's club, then the domain `Player` from the linked records.
+- `report`: the checks that reject a bad import, and the diagnostics.
+
 Bump `PARSER_VERSION` whenever the parser output or the snapshot schema changes, or re-import
 reuses the cached snapshot.
 

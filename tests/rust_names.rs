@@ -1,4 +1,4 @@
-use fm_savelens_backend::adapters::parser::people::display_name;
+use fm_savelens_backend::adapters::parser::records::people::display_name;
 
 #[test]
 fn nickname_wins_over_first_and_last() {

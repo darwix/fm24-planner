@@ -6,11 +6,13 @@
 //! ```
 //! The three pools sit back to back. People follow them; clubs and teams come before.
 use super::{
-    archive::check,
-    bytes::u32,
+    super::bytes::u32,
     scan::{checkpoint, text},
 };
-use crate::{utils::cancel::CancelFlag, Error, Result};
+use crate::{
+    utils::cancel::{check, CancelFlag},
+    Error, Result,
+};
 
 const POOL_COUNT: usize = 4;
 const POOL_ENTRY: usize = 8;

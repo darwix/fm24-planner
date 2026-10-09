@@ -2,9 +2,11 @@
 // Contract block sits just before the person record:
 //   [start yr u16][00 00][X u32][FF FF FF FF] ... [expiry day u16][expiry yr u16]   (expiry = X + 12)
 //   [eid u32][team u32][00 x4][weekly wage u32][01 ?? 00] ...                        (wage anchor)
-use super::abilities::Ability;
-use super::bytes::{u16, u32};
-use super::save::date_of;
+use super::abilities::{Ability, Linked};
+use crate::adapters::parser::bytes::{u16, u32};
+use crate::adapters::parser::meta::date_of;
+use crate::utils::cancel::{check, CancelFlag};
+use crate::Result;
 
 #[derive(Default)]
 pub struct Contract {
@@ -77,4 +79,18 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
 pub fn value(b: &[u8], ability_offset: usize) -> Option<u32> {
     let p: usize = ability_offset + Ability::ATTRIBUTES;
     (p + 4 <= b.len()).then(|| u32(b, p))
+}
+
+/// How far before a person record its contract can sit.
+const WINDOW: usize = 800;
+
+/// The contract of each linked person, in order.
+pub fn for_people(db: &[u8], linked: &Linked, cancel: &CancelFlag) -> Result<Vec<Contract>> {
+    let mut contracts = vec![];
+    for &(person, _) in &linked.pairs {
+        check(cancel)?;
+        let window = &db[person.offset.saturating_sub(WINDOW)..person.offset];
+        contracts.push(find(window, person.id as u32));
+    }
+    Ok(contracts)
 }

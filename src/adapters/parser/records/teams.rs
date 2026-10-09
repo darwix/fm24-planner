@@ -9,11 +9,14 @@
 //! A team belongs to a club through its owner id, its name, or (in `save`) the contracts of
 //! its players.
 use super::{
-    archive::check,
-    bytes::{u16, u32},
+    super::bytes::{u16, u32},
     scan::scan,
 };
-use crate::{domain::entities::Club, utils::cancel::CancelFlag, Result};
+use crate::{
+    domain::entities::Club,
+    utils::cancel::{check, CancelFlag},
+    Result,
+};
 use std::collections::{HashMap, HashSet};
 
 pub struct Team {

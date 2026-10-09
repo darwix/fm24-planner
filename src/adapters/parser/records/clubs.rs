@@ -5,7 +5,7 @@
 //! [name][short name len u32][short name]
 //! ```
 use super::{
-    bytes::u32,
+    super::bytes::u32,
     scan::{is_set, scan, text},
 };
 use crate::{domain::entities::Club, utils::cancel::CancelFlag, Result};

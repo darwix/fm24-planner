@@ -1,13 +1,11 @@
-pub mod abilities;
 pub mod archive;
 pub mod bytes;
-pub mod clubs;
-pub mod contract;
-pub mod names;
-pub mod people;
+mod meta;
+mod player;
 pub mod reader;
+pub mod records;
+mod report;
 pub mod save;
-mod scan;
-pub mod teams;
 
-pub use save::{managed_club_id, parse_save, PARSER_VERSION};
+pub use meta::managed_club_id;
+pub use save::{parse_save, PARSER_VERSION};

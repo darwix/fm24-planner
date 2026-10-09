@@ -17,7 +17,7 @@ infra ──▶ adapters ──▶ application ──▶ domain
 
 ```
 src/
-├── main.rs                 thin: parse args, call infra::server::run
+├── main.rs                 parse args, start the server, wait for Ctrl+C
 ├── lib.rs                  module declarations and re-exports
 ├── domain/                 what the app is about, no I/O
 │   ├── entities/           Player, ParsedSave, Job, Settings, SnapshotId, PlayerFilter, ...
@@ -39,7 +39,6 @@ src/
 │   └── parser/             reads the .fm save format
 ├── infra/
 │   ├── setup.rs            init_app_state: builds adapters and use cases
-│   ├── server.rs           bind, serve, graceful shutdown, CLI entry point
 │   ├── app.rs              router with the host and origin guard
 │   ├── data_dir.rs         data directory, instance lock, leftover cleanup
 │   └── config.rs           command-line arguments and defaults
@@ -114,7 +113,8 @@ reuses the cached snapshot.
 
 - `setup::init_app_state(data)` opens the data directory, builds the concrete adapters, injects
   them into the use cases and returns the `AppState`.
-- `server::start` binds the port and serves; `server::run` is the command-line entry point.
+- `main` parses the arguments, binds the port, serves, and shuts down on Ctrl+C. Tests do the same
+  in `tests/support::start`.
 - `app::create_app` merges the route modules and adds the host and origin guard. The server is
   API-only; the React app in `web/` is served by Vite.
 

@@ -119,3 +119,13 @@ fn contract_team_field_is_read() {
     let c = find(&bytes(include_str!("fixtures/krznar.hex")), 529029);
     assert_eq!(c.team, Some(1298));
 }
+
+#[test]
+fn youth_contract_has_no_start_year_before_the_expiry() {
+    check(
+        include_str!("fixtures/strand.hex"),
+        638149,
+        220,
+        "2053-06-30",
+    );
+}

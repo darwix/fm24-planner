@@ -3,6 +3,7 @@
 //   [start yr u16][00 00][X u32][FF FF FF FF] ... [expiry day u16][expiry yr u16]   (expiry = X + 12)
 //   [eid u32][team u32][00 x4][weekly wage u32][01 ?? 00] ...                        (wage anchor)
 use super::date_of;
+use crate::utils::bytes::{u16, u32};
 
 #[derive(Default)]
 pub struct Contract {
@@ -11,31 +12,40 @@ pub struct Contract {
     pub contract_end: Option<String>,
 }
 
-fn u16(b: &[u8], p: usize) -> u16 {
-    u16::from_le_bytes([b[p], b[p + 1]])
-}
-fn u32(b: &[u8], p: usize) -> u32 {
-    u32::from_le_bytes([b[p], b[p + 1], b[p + 2], b[p + 3]])
-}
+// Wage anchor, offsets from the start of `[eid]`.
+const TEAM: usize = 4;
+const ZEROS: usize = 8;
+const WAGE: usize = 12;
+const FLAG: usize = 16; // == 1
+const FLAG_PAD: usize = 18; // == 0
+const ANCHOR_LEN: usize = 19;
+// Expiry block, offsets from `q`, the u32 `X` that follows `[start yr][00 00]`.
+const FF_RUN: usize = 4; // youth: FF run here; standard: here or one u32 later
+const DAY: usize = 12;
+const YEAR: usize = 14;
+
 
 /// `window` is the bytes before the person record. The first anchor with a wage wins, so a
 /// loaned player reads the parent contract, not the zero-wage loan row.
 pub fn find(window: &[u8], eid: u32) -> Contract {
     let needle = eid.to_le_bytes();
-    let anchor = (0..window.len().saturating_sub(19))
+    let anchor = (0..window.len().saturating_sub(ANCHOR_LEN))
         .filter(|&i| window[i..i + 4] == needle)
-        .filter(|&i| window[i + 8..i + 12] == [0; 4] && window[i + 16] == 1 && window[i + 18] == 0)
-        .find(|&i| u32(window, i + 12) > 0);
+        .filter(|&i| window[i + ZEROS..i + WAGE] == [0; 4] && window[i + FLAG] == 1 && window[i + FLAG_PAD] == 0)
+        .find(|&i| u32(window, i + WAGE) > 0);
     let Some(i) = anchor else {
         return Contract::default();
     };
     let expiry = |q: usize| {
-        let (day, year) = (u16(window, q + 12) & 511, u16(window, q + 14));
-        let ok = (2020..=2100).contains(&u16(window, q - 4))
-            && window[q - 2..q] == [0; 2]
-            && (window[q + 4..q + 8] == [0xff; 4] || window[q + 8..q + 12] == [0xff; 4]) // an extra u32 can precede the run
+        let (day, year) = (u16(window, q + DAY) & 511, u16(window, q + YEAR));
+        // Youth contracts have no start year: [FF x4][u32][day][year] instead of [start yr][00 00][X].
+        let youth = window[q + FF_RUN..q + FF_RUN + 4] == [0xff; 4] && window[q + DAY - 2..q + DAY] == [0; 2];
+        let ok = (youth
+            || (2020..=2100).contains(&u16(window, q - 4))
+                && window[q - 2..q] == [0; 2]
+                && (window[q + FF_RUN..q + FF_RUN + 4] == [0xff; 4] || window[q + FF_RUN + 4..q + FF_RUN + 8] == [0xff; 4])) // an extra u32 can precede the run
             && u32(window, q) != u32::MAX // overlaps the previous candidate's FF run
-            && year >= u16(window, q - 4) // expiry never precedes the start
+            && (youth || year >= u16(window, q - 4)) // expiry never precedes the start
             && (1..=366).contains(&day)
             && (2020..=2100).contains(&year)
             && year != 2047; // 0x07FF: all-ones sentinel, not a date
@@ -49,8 +59,8 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
         expiry(q)
     });
     Contract {
-        wage: Some(u32(window, i + 12)),
-        team: Some(u32(window, i + 4)),
+        wage: Some(u32(window, i + WAGE)),
+        team: Some(u32(window, i + TEAM)),
         contract_end,
     }
 }

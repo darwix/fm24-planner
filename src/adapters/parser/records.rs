@@ -430,6 +430,40 @@ struct Head {
     typed: bool,
     kind: u8,
     flag: u8,
+    /// Reserve/youth records carry their own name in place of the ten zero bytes.
+    name: Option<String>,
+}
+/// Reserve/youth record: owner, name twice (length-prefixed, NUL-terminated), then ordinal, uid, uid, 10.
+fn named_head(b: &[u8], p: usize) -> Option<Head> {
+    let l = u32(b, p) as usize;
+    if !(3..=40).contains(&l) || p < 4 || p + 2 * l + 40 > b.len() {
+        return None;
+    }
+    let text = &b[p + 4..p + 4 + l];
+    let q = p + 5 + l;
+    if b[p + 4 + l] != 0
+        || !text.iter().all(|c| (32..127).contains(c))
+        || u32(b, q) as usize != l
+        || b[q + 4..q + 4 + l] != *text
+        || b[q + 4 + l] != 0
+    {
+        return None;
+    }
+    let r = q + 5 + l;
+    let (ordinal, uid) = (u32(b, r), u32(b, r + 4));
+    if uid == 0 || uid != u32(b, r + 8) || b[r + 12] != 10 || ordinal > 500000 {
+        return None;
+    }
+    Some(Head {
+        offset: r - 14,
+        owner: u32(b, p - 4),
+        ordinal,
+        uid,
+        typed: false,
+        kind: 100,
+        flag: 0,
+        name: Some(String::from_utf8_lossy(text).into_owned()),
+    })
 }
 pub fn teams(
     b: &[u8],
@@ -445,6 +479,11 @@ pub fn teams(
         checkpoint(p, cancel)?;
         let at = p;
         p += 1;
+        if let Some(h) = named_head(b, at) {
+            p = h.offset + 26;
+            heads.push(h);
+            continue;
+        }
         if b[at + 26] != 10 || b[at + 4..at + 14] != [0; 10] {
             continue;
         }
@@ -466,6 +505,7 @@ pub fn teams(
             typed,
             kind: if typed { b[at - 3] } else { 100 },
             flag: if typed { b[at - 1] } else { 0 },
+            name: None,
         });
         p = at + 26;
     }
@@ -477,7 +517,18 @@ pub fn teams(
             .map_or(end, |h| h.offset)
             .min(h.offset + 10000);
         let mut club = None;
-        if club_map.get(&h.owner).is_some_and(|c| c.uid == h.uid) {
+        if let Some(name) = &h.name {
+            // owner - 1 is the parent club; otherwise the name minus its last word ("OGC Nice 2")
+            let parent = name.rsplit_once(' ').map_or(name.as_str(), |x| x.0);
+            let by_name = |n: &str| {
+                let mut ids = clubs.iter().filter(|c| c.short_name == n).map(|c| c.id);
+                ids.next().filter(|_| ids.next().is_none())
+            };
+            club = Some(h.owner.wrapping_sub(1))
+                .filter(|id| club_map.contains_key(id))
+                .or_else(|| by_name(name))
+                .or_else(|| by_name(parent));
+        } else if club_map.get(&h.owner).is_some_and(|c| c.uid == h.uid) {
             club = Some(h.owner);
         } else if h.typed && !(h.kind == 100 && h.flag & 32 != 0) && h.owner > 256 {
             let id = if [20, 23].contains(&h.kind) {

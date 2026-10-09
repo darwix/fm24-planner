@@ -202,6 +202,16 @@ export default function Swipe() {
     }
   }, [i, stack.length, total, loaded, more]);
 
+  const keys = useRef<Record<string, () => void>>({});
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      keys.current[e.key]?.();
+    };
+    window.addEventListener("keydown", on);
+    return () => window.removeEventListener("keydown", on);
+  }, []);
+
   if (!club || !snap) return <Navigate to="/upload" replace />;
   const top = stack[i];
   const rest = stack.slice(i, i + 3);
@@ -234,6 +244,12 @@ export default function Swipe() {
     if (h.dir > 0) setKept((k) => k.filter((q) => q.id !== h.p.id));
     else removePassed(snap, h.p.id);
     setI(i - 1);
+  };
+  keys.current = {
+    ArrowLeft: () => fly(-1),
+    ArrowRight: () => fly(1),
+    ArrowUp: undo,
+    z: undo,
   };
   const book = () => {
     if (!open) return setOpen(true);

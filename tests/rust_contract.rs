@@ -111,3 +111,11 @@ fn dawson_prefers_the_earlier_of_two_overlapping_matches() {
         "2056-06-30",
     );
 }
+
+#[test]
+fn contract_team_field_is_read() {
+    let c = find(&bytes(include_str!("fixtures/pietrangeli.hex")), 448321);
+    assert_eq!(c.team, Some(432));
+    let c = find(&bytes(include_str!("fixtures/krznar.hex")), 529029);
+    assert_eq!(c.team, Some(1298));
+}

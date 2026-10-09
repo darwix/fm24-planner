@@ -99,7 +99,10 @@ pub fn create_snapshot(
                 p.contract_end
                     .clone()
                     .map_or(SqlValue::Null, SqlValue::Text),
-                p.value.map_or(SqlValue::Null, |v| (v as i64).into()),
+                // a value of 0 means the save has none, so keep it unknown
+                p.value
+                    .filter(|v| *v > 0)
+                    .map_or(SqlValue::Null, |v| (v as i64).into()),
             ];
             values.extend(CATALOG.attributes.iter().map(|a| {
                 p.attributes

@@ -87,3 +87,13 @@ fn post_body_becomes_the_same_query_as_get() {
     assert_eq!(pairs["q"], "a b");
     assert!(!pairs.contains_key("skip"));
 }
+
+#[test]
+fn zero_value_in_the_save_is_stored_as_unknown() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = storage::open_snapshot(&snapshot(&dir)).unwrap();
+    // fixture players carry a value of 0, which must not count as cheap
+    let total = |q: &str| storage::search(&db, q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("valueMax=5000000"), 0);
+    assert_eq!(total("valueMax=5000000&valueUnknown=1"), 64);
+}

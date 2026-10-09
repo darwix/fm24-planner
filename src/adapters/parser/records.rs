@@ -18,6 +18,10 @@ fn checkpoint(p: usize, c: &CancelFlag) -> Result<()> {
     }
     Ok(())
 }
+/// 0 and all-ones mark an unset id.
+fn is_set(v: u32) -> bool {
+    v != 0 && v != u32::MAX
+}
 
 /// A name pool is `[count u32]` then, per name, `[id u32][len u32][text]`.
 const POOL_COUNT: usize = 4;
@@ -117,11 +121,14 @@ pub struct Person {
     pub other_nations: Vec<u32>,
     pub identity_offset: usize,
 }
-#[derive(Clone)]
 struct Identity {
     offset: usize,
     id: u32,
     uid: u32,
+}
+/// Name `id` in `pool`, if the id is in range.
+fn pick(pool: &[String], id: u32) -> Option<&str> {
+    pool.get(id as usize).map(String::as_str)
 }
 /// The nickname (common name) wins when the player has one, else first + last.
 pub fn display_name(first: &str, last: &str, common: Option<&str>) -> String {
@@ -185,63 +192,55 @@ impl PersonTail {
     }
 }
 
-/// One entry of the other-nationality list: nation id, four zero bytes, then markers.
-struct OtherNation {
-    nation: u32,
-}
-impl OtherNation {
-    const SIZE: usize = 16;
-    fn read(b: &[u8], at: usize) -> Option<Self> {
-        let nation = u32(b, at);
-        (nation < 256
-            && b[at + 4..at + 8] == [0; 4]
-            && b[at + 10] == 8
-            && [9, 70].contains(&b[at + 11]))
-        .then_some(Self { nation })
-    }
+/// One 16-byte entry of the other-nationality list: `[nation u32][00 x4] .. [08][09 or 70]`.
+const OTHER_NATION_SIZE: usize = 16;
+fn other_nation(b: &[u8], at: usize) -> Option<u32> {
+    let nation = u32(b, at);
+    (nation < 256
+        && b[at + 4..at + 8] == [0; 4]
+        && b[at + 10] == 8
+        && [9, 70].contains(&b[at + 11]))
+    .then_some(nation)
 }
 
-/// Entity identity found after a person record: id, uid, then the uid again or a source id.
-/// Records whose uid is not repeated carry a date and flags just before the id.
-struct IdentityRec {
-    id: u32,
-    uid: u32,
-}
-impl IdentityRec {
-    /// Bytes before the id that the checks look at.
-    const BACK: usize = 12;
-    /// Bytes from the id that the checks look at.
-    const SIZE: usize = 12;
-    fn read(b: &[u8], p: usize) -> Option<Self> {
-        if b[p - 1] != 0
-            || b[p - 2] != 0
-            || b[p - 3] != 0
-            || b[p - 7] & 7 > 2
-            || ![0, 1, 4, 5].contains(&b[p - 4])
+/// Bytes from an identity's id that [`identity`] reads.
+const IDENTITY_SIZE: usize = 12;
+/// Entity identity at `p`: `[id u32][uid u32][uid again, or a source id u32]`, preceded by a
+/// type byte and three zero bytes. When the uid is not repeated, a birth date and flags sit
+/// just before it.
+fn identity(b: &[u8], p: usize, max_id: u64) -> Option<Identity> {
+    if b[p - 1] != 0
+        || b[p - 2] != 0
+        || b[p - 3] != 0
+        || b[p - 7] & 7 > 2
+        || ![0, 1, 4, 5].contains(&b[p - 4])
+    {
+        return None;
+    }
+    let (id, uid, source) = (u32(b, p), u32(b, p + 4), u32(b, p + 8));
+    if id as u64 >= max_id || !is_set(uid) {
+        return None;
+    }
+    if uid != source {
+        if p < 12 {
+            return None;
+        }
+        let (day, year, flags) = (u16(b, p - 12) & 511, u16(b, p - 10), b[p - 6]);
+        if !(1..=366).contains(&day)
+            || !(1900..=2300).contains(&year)
+            || flags & 0x85 != 0
+            || flags & 0x60 == 0
+            || source < 1000
+            || source == u32::MAX
         {
             return None;
         }
-        Some(Self {
-            id: u32(b, p),
-            uid: u32(b, p + 4),
-        })
     }
-    /// The u32 after the uid: the uid again, or a source id.
-    fn source(b: &[u8], p: usize) -> u32 {
-        u32(b, p + 8)
+    // Round ids whose bytes repeat are padding, not an identity.
+    if id & 255 == 0 && uid & 255 == 0 && u32(b, p + 5) == u32(b, p + 9) {
+        return None;
     }
-    /// Date and flags that must hold when the uid is not repeated.
-    fn dated(b: &[u8], p: usize) -> bool {
-        let (day, year, flags) = (u16(b, p - 12) & 511, u16(b, p - 10), b[p - 6]);
-        (1..=366).contains(&day)
-            && (1900..=2300).contains(&year)
-            && flags & 0x85 == 0
-            && flags & 0x60 != 0
-    }
-    /// Round ids whose bytes repeat are padding, not an identity.
-    fn padding(&self, b: &[u8], p: usize) -> bool {
-        self.id & 255 == 0 && self.uid & 255 == 0 && u32(b, p + 5) == u32(b, p + 9)
-    }
+    Some(Identity { offset: p, id, uid })
 }
 
 pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person>> {
@@ -270,23 +269,13 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
         let Some(full_name) = text(&b[start + PersonHead::SIZE..end]) else {
             continue;
         };
-        let first = names
-            .first
-            .get(head.first as usize)
-            .map(String::as_str)
-            .unwrap_or("");
-        let last = names
-            .last
-            .get(head.last as usize)
-            .map(String::as_str)
-            .unwrap_or("");
-        let common = names.common.get(head.common as usize).map(String::as_str);
-        let name = display_name(first, last, common);
-        let name = if name.is_empty() {
-            full_name.clone()
-        } else {
-            name
-        };
+        let name = Some(display_name(
+            pick(&names.first, head.first).unwrap_or(""),
+            pick(&names.last, head.last).unwrap_or(""),
+            pick(&names.common, head.common),
+        ))
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| full_name.clone());
         if name.is_empty() {
             continue;
         }
@@ -315,31 +304,9 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
     }
     let max_id = u32(b, names.end) as u64 + 1;
     let mut identities = Vec::new();
-    for p in names.end + 7..b.len().saturating_sub(IdentityRec::SIZE) {
+    for p in names.end + 7..b.len().saturating_sub(IDENTITY_SIZE) {
         checkpoint(p, cancel)?;
-        let Some(rec) = IdentityRec::read(b, p) else {
-            continue;
-        };
-        if rec.id as u64 >= max_id || rec.uid == 0 || rec.uid == u32::MAX {
-            continue;
-        }
-        let source = IdentityRec::source(b, p);
-        if rec.uid != source
-            && (p < IdentityRec::BACK
-                || !IdentityRec::dated(b, p)
-                || source < 1000
-                || source == u32::MAX)
-        {
-            continue;
-        }
-        if rec.padding(b, p) {
-            continue;
-        }
-        identities.push(Identity {
-            offset: p,
-            id: rec.id,
-            uid: rec.uid,
-        });
+        identities.extend(identity(b, p, max_id));
     }
     // Reproduce the strictly ascending entity chain, including tie replacement.
     let mut tails: Vec<u32> = vec![];
@@ -362,7 +329,7 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
     let mut ordered = vec![];
     let mut ix = indices.last().copied();
     while let Some(i) = ix {
-        ordered.push(identities[i].clone());
+        ordered.push(&identities[i]);
         ix = prev[i];
     }
     ordered.reverse();
@@ -385,16 +352,14 @@ pub fn people(b: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person
         let count = b[person.end + PersonTail::NATIONS_COUNT] as usize;
         let list = person.end + PersonTail::NATIONS;
         if b[person.end + PersonTail::NATIONS_FLAG] == 1
-            && list + count * OtherNation::SIZE <= identity.offset
+            && list + count * OTHER_NATION_SIZE <= identity.offset
         {
             for k in 0..count {
-                let Some(other) = OtherNation::read(b, list + k * OtherNation::SIZE) else {
+                let Some(nation) = other_nation(b, list + k * OTHER_NATION_SIZE) else {
                     continue;
                 };
-                if other.nation != person.nation as u32
-                    && !person.other_nations.contains(&other.nation)
-                {
-                    person.other_nations.push(other.nation);
+                if nation != person.nation as u32 && !person.other_nations.contains(&nation) {
+                    person.other_nations.push(nation);
                 }
             }
         }
@@ -413,64 +378,46 @@ pub struct Ability {
 }
 /// Ability block, read from `at`, the start of its attribute ratings:
 /// `[owner u32][uid u32][source u32] .. [ca][00][pa][00] .. [team u32] .. [15 position ratings][54 attributes]`.
-pub(super) struct AbilityBlock<'a> {
-    owner: u32,
-    uid: u32,
-    source: u32,
-    ca: u8,
-    pa: u8,
-    team: u32,
-    positions: &'a [u8],
-    attributes: &'a [u8],
-}
-impl<'a> AbilityBlock<'a> {
+impl Ability {
     /// Bytes from the owner id to the attributes.
     const BEFORE: usize = 57;
     pub(super) const ATTRIBUTES: usize = 54;
-    /// None unless the bytes after CA and PA are zero.
-    fn read(b: &'a [u8], at: usize) -> Option<Self> {
-        (b[at - 37] == 0 && b[at - 35] == 0).then(|| Self {
-            owner: u32(b, at - 57),
-            uid: u32(b, at - 53),
-            source: u32(b, at - 49),
-            ca: b[at - 38],
-            pa: b[at - 36],
+    fn read(b: &[u8], at: usize) -> Option<Self> {
+        let (ca, pa) = (b[at - 38], b[at - 36]);
+        let positions = &b[at - 15..at];
+        let attributes = &b[at..at + Self::ATTRIBUTES];
+        let ok = b[at - 37] == 0
+            && b[at - 35] == 0
+            && (1..=200).contains(&ca)
+            && (1..=200).contains(&pa)
+            && positions.iter().all(|v| (1..=20).contains(v))
+            && positions.contains(&20)
+            && attributes.iter().all(|v| (1..=100).contains(v))
+            && is_set(u32(b, at - 53))
+            && is_set(u32(b, at - 49));
+        ok.then(|| Self {
+            offset: at,
+            owner_id: u32(b, at - 57) as u64 + 1,
+            ca,
+            pa,
             team: u32(b, at - 23),
-            positions: &b[at - 15..at],
-            attributes: &b[at..at + Self::ATTRIBUTES],
+            positions: positions.to_vec(),
+            raw: attributes.to_vec(),
         })
-    }
-    fn plausible(&self) -> bool {
-        (1..=200).contains(&self.ca)
-            && (1..=200).contains(&self.pa)
-            && self.positions.iter().all(|v| (1..=20).contains(v))
-            && self.positions.contains(&20)
-            && self.attributes.iter().all(|v| (1..=100).contains(v))
-            && ![0, u32::MAX].contains(&self.uid)
-            && ![0, u32::MAX].contains(&self.source)
     }
 }
 
 pub fn abilities(b: &[u8], start: usize, cancel: &CancelFlag) -> Result<Vec<Ability>> {
     let mut blocks = vec![];
-    let mut p = start + AbilityBlock::BEFORE;
-    while p < b.len().saturating_sub(AbilityBlock::ATTRIBUTES) {
+    let mut p = start + Ability::BEFORE;
+    while p < b.len().saturating_sub(Ability::ATTRIBUTES) {
         checkpoint(p, cancel)?;
         let at = p;
         p += 1;
-        let Some(block) = AbilityBlock::read(b, at).filter(AbilityBlock::plausible) else {
-            continue;
-        };
-        blocks.push(Ability {
-            offset: at,
-            owner_id: block.owner as u64 + 1,
-            ca: block.ca,
-            pa: block.pa,
-            team: block.team,
-            positions: block.positions.to_vec(),
-            raw: block.attributes.to_vec(),
-        });
-        p = at + AbilityBlock::ATTRIBUTES;
+        if let Some(block) = Ability::read(b, at) {
+            blocks.push(block);
+            p = at + Ability::ATTRIBUTES;
+        }
     }
     Ok(blocks)
 }
@@ -514,7 +461,7 @@ pub fn clubs(b: &[u8], end: usize, cancel: &CancelFlag) -> Result<Vec<Club>> {
         let Some(head) = ClubHead::read(b, at) else {
             continue;
         };
-        if head.nation > 255 || [0, u32::MAX].contains(&head.uid) || head.id > 100000 {
+        if head.nation > 255 || !is_set(head.uid) || head.id > 100000 {
             continue;
         }
         let n = head.name_len;
@@ -564,21 +511,22 @@ struct Head {
     name: Option<String>,
 }
 /// Team head: `[owner u32][00 x10][ordinal u32][uid u32][uid u32][10]`, optionally preceded by
-/// `[01][kind][FF][flag]`. The roster follows somewhere after it.
-impl Head {
-    const ZEROS: std::ops::Range<usize> = 4..14;
-    const ORDINAL: usize = 14;
-    const UID: usize = 18;
-    const UID_AGAIN: usize = 22;
-    /// Holds 10.
-    const MARKER: usize = 26;
-    /// Where the next head can start.
-    const SIZE: usize = 26;
-    /// Where the roster search starts.
-    const ROSTER_FROM: usize = 30;
-}
+/// `[01][kind][FF][flag]`. Reserve/youth heads carry their name in place of the zero bytes.
+/// The next head can start at the `10` marker.
+const HEAD_SIZE: usize = 26;
+/// Where the roster search starts, from the head.
+const ROSTER_FROM: usize = 30;
 /// Roster: `[FF x4][count u16][count ids u32][captain u32][vice u32]`.
 const ROSTER_IDS: usize = 6;
+/// Ordinal, uid and repeated uid of the head at `offset`, if its marker and ids are plausible.
+fn head_ids(b: &[u8], offset: usize) -> Option<(u32, u32, u32)> {
+    let (ordinal, uid, again) = (
+        u32(b, offset + 14),
+        u32(b, offset + 18),
+        u32(b, offset + 22),
+    );
+    (b[offset + HEAD_SIZE] == 10 && ordinal <= 500000 && uid != 0).then_some((ordinal, uid, again))
+}
 /// Reserve/youth record: owner, name twice (length-prefixed, NUL-terminated), then ordinal, uid, uid, 10.
 fn named_head(b: &[u8], p: usize) -> Option<Head> {
     let l = u32(b, p) as usize;
@@ -595,13 +543,10 @@ fn named_head(b: &[u8], p: usize) -> Option<Head> {
     {
         return None;
     }
-    let offset = q + 5 + l - Head::ORDINAL;
-    let (ordinal, uid) = (u32(b, offset + Head::ORDINAL), u32(b, offset + Head::UID));
-    if uid == 0
-        || uid != u32(b, offset + Head::UID_AGAIN)
-        || b[offset + Head::MARKER] != 10
-        || ordinal > 500000
-    {
+    // The ordinal follows the second name.
+    let offset = q + 5 + l - 14;
+    let (ordinal, uid, again) = head_ids(b, offset)?;
+    if uid != again {
         return None;
     }
     Some(Head {
@@ -648,26 +593,23 @@ pub fn teams(
         let at = p;
         p += 1;
         if let Some(h) = named_head(b, at) {
-            p = h.offset + Head::SIZE;
+            p = h.offset + HEAD_SIZE;
             heads.push(h);
             continue;
         }
-        if b[at + Head::MARKER] != 10 || b[at + Head::ZEROS.start..at + Head::ZEROS.end] != [0; 10]
-        {
+        if b[at + 4..at + 14] != [0; 10] {
             continue;
         }
-        let (owner, ordinal, uid) = (
-            u32(b, at),
-            u32(b, at + Head::ORDINAL),
-            u32(b, at + Head::UID),
-        );
-        if owner > 100000 || ordinal > 500000 || uid == 0 {
+        let Some((ordinal, uid, again)) = head_ids(b, at) else {
+            continue;
+        };
+        let owner = u32(b, at);
+        if owner > 100000 {
             continue;
         }
         let typed =
             b[at - 4] == 1 && b[at - 2] == 255 && [18, 19, 20, 21, 23, 100].contains(&b[at - 3]);
-        let matched = club_map.get(&owner).is_some_and(|c| c.uid == uid)
-            && u32(b, at + Head::UID_AGAIN) == uid;
+        let matched = club_map.get(&owner).is_some_and(|c| c.uid == uid) && again == uid;
         if !typed && !matched {
             continue;
         }
@@ -681,7 +623,7 @@ pub fn teams(
             flag: if typed { b[at - 1] } else { 0 },
             name: None,
         });
-        p = at + Head::SIZE;
+        p = at + HEAD_SIZE;
     }
     let mut teams = vec![];
     for (i, h) in heads.iter().enumerate() {
@@ -718,7 +660,7 @@ pub fn teams(
             }
         }
         let mut members = vec![];
-        for p in h.offset + Head::ROSTER_FROM..limit.saturating_sub(14) {
+        for p in h.offset + ROSTER_FROM..limit.saturating_sub(14) {
             if b[p] != 255 || u32(b, p) != u32::MAX {
                 continue;
             }

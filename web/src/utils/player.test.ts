@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { POS_INDEX, scoutQuery, monthsLeft, toPool } from "./player";
+import { POS_INDEX, nameQuery, scoutQuery, monthsLeft, toPool } from "./player";
 
 describe("monthsLeft", () => {
   it("counts whole months from the game date to the contract end", () => {
@@ -87,5 +87,19 @@ describe("scoutQuery", () => {
     expect(q.club).toBe(-1);
     expect(q.contractEndMax).toBeUndefined();
     expect(q.valueUnknown).toBe(1);
+  });
+});
+
+describe("nameQuery", () => {
+  it("searches by trimmed name with no other filters, ranked by potential", () => {
+    expect(nameQuery("  Soldi ")).toEqual({
+      q: "Soldi",
+      sort: "pa",
+      limit: 250,
+    });
+  });
+  it("is null for an empty or blank search", () => {
+    expect(nameQuery("")).toBeNull();
+    expect(nameQuery("   ")).toBeNull();
   });
 });

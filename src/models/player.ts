@@ -1,4 +1,4 @@
-export type Tag = "exp" | "list" | "cheap";
+export type Tag = "exp" | "cheap";
 
 export interface SquadPlayer {
   id?: number | string;
@@ -8,6 +8,7 @@ export interface SquadPlayer {
   ca: number;
   pa: number;
   c?: number;
+  left?: number;
   v?: number;
   w?: number;
   xi?: 1;
@@ -18,6 +19,7 @@ export interface SquadPlayer {
 
 // scouting / shortlist candidate before it is tagged
 export interface PoolPlayer {
+  id: number;
   n: string;
   cl: string;
   nat: string;
@@ -25,14 +27,14 @@ export interface PoolPlayer {
   a: number;
   ca: number;
   pa: number;
-  left: number;
-  v: number;
-  w: number;
+  c?: number;
+  left?: number;
+  v?: number;
+  w?: number;
 }
 
 export interface Candidate extends Omit<PoolPlayer, "nat"> {
   nat?: string;
-  c?: number;
   m: number;
   tags: Tag[];
   at?: Record<string, number>;
@@ -54,6 +56,5 @@ export interface ScoutList {
 
 export const TAG: Record<Tag, string> = {
   exp: "Contract expiring",
-  list: "Transfer listed",
   cheap: "Cheap",
 };

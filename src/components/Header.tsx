@@ -1,14 +1,12 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useRecoilValue } from "recoil";
 import { clubState, squadState } from "@/atoms/squadState";
-import { useCands } from "@/services/save";
 
 const tab = ({ isActive }: { isActive: boolean }) => (isActive ? "on" : "");
 
 export default function Header() {
   const club = useRecoilValue(clubState);
   const squad = useRecoilValue(squadState);
-  const cands = useCands();
   const nav = useNavigate();
   const { pathname } = useLocation();
   return (
@@ -20,14 +18,14 @@ export default function Header() {
           Squad
         </NavLink>
         <NavLink to="/shortlist" className={tab}>
-          Shortlist <em>{cands?.length ?? 0}</em>
+          Shortlist
         </NavLink>
         <NavLink
           to="/scouting"
           className={({ isActive }) =>
             isActive ||
             (pathname.startsWith("/player/") &&
-              !squad.some((s) => s.n === decodeURIComponent(pathname.slice(8))))
+              !squad.some((s) => String(s.id) === pathname.slice(8)))
               ? "on"
               : ""
           }

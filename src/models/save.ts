@@ -31,5 +31,10 @@ export interface ApiPlayer {
   age: number;
   ca: number;
   pa: number;
+  club: string | null;
+  nationalities: string[];
   positions: string[];
+  wage: number | null;
+  contractEnd: string | null;
+  value: number | null;
 }

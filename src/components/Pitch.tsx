@@ -14,7 +14,7 @@ export default function Pitch({ squad, sel, onPick }: Props) {
           s.xi && (
             <div
               key={i}
-              className={`pl ${i === sel ? "sel" : ""} ${s.c && s.c <= 2052 ? "bad" : ""}`}
+              className={`pl ${i === sel ? "sel" : ""} ${s.left !== undefined && s.left <= 12 ? "bad" : ""}`}
               style={{ left: `${s.x}%`, top: `${s.y}%` }}
               onClick={() => onPick(i)}
             >

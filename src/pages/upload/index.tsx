@@ -31,6 +31,7 @@ export default function Upload() {
   const [job, setJob] = useState<ImportJob | null>(null);
   const [snap, setSnap] = useState("");
   const [clubs, setClubs] = useState<Club[]>([]);
+  const [gameDate, setGameDate] = useState("");
   const [name, setName] = useState("");
   const [err, setErr] = useState("");
 
@@ -50,7 +51,9 @@ export default function Upload() {
     setErr("");
     try {
       const id = await importSave(s.id, setJob);
-      setClubs((await getSnapshot(id)).clubs);
+      const sn = await getSnapshot(id);
+      setClubs(sn.clubs);
+      setGameDate(sn.gameDate);
       setSnap(id);
     } catch (e: any) {
       setFile(null);
@@ -68,7 +71,7 @@ export default function Upload() {
       club: club.id,
       limit: 100,
     });
-    const squad = buildSquad(players);
+    const squad = buildSquad(players, gameDate);
     setSquad(squad);
     setSel(
       Math.max(
@@ -76,7 +79,7 @@ export default function Upload() {
         squad.findIndex((s) => s.xi),
       ),
     );
-    setClub({ name: club.name, snapshotId: snap });
+    setClub({ name: club.name, snapshotId: snap, gameDate });
     nav("/squad");
   };
 

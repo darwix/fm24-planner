@@ -718,3 +718,11 @@ nav em {
     serif;
   color: var(--ink);
 }
+
+.cand h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+.cand h3 a:hover {
+  text-decoration: underline;
+}

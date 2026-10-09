@@ -8,7 +8,7 @@ const GROUPS: [string, string][] = [
   ["Centre back", "DC"],
   ["Left back", "DL"],
   ["Defensive mid", "DM"],
-  ["Attacking mid", "AM"],
+  ["Attacking mid", "AMC"],
   ["Right wing", "AMR"],
   ["Left wing", "AML"],
   ["Striker", "ST"],

@@ -25,9 +25,9 @@ describe("buildSquad", () => {
     ]);
     expect(s.filter((x) => x.xi).map((x) => x.n)).toEqual(["B", "C"]);
   });
-  it("fills the AM slot from the backend's AMC", () => {
+  it("fills the AMC slot", () => {
     const s = buildSquad([pl("A", ["AMC"], 150)]);
-    expect(s[0]).toMatchObject({ p: "AM", xi: 1 });
+    expect(s[0]).toMatchObject({ p: "AMC", xi: 1 });
   });
   it("carries contract, value and wage from the save", () => {
     const [x] = buildSquad(
@@ -41,10 +41,10 @@ describe("buildSquad", () => {
       ],
       "2053-02-18",
     );
-    expect(x).toMatchObject({ c: 2056, left: 39, v: 96.4, w: 455 });
+    expect(x).toMatchObject({ c: 2056, left: 40, v: 96.4, w: 455 });
   });
   it("uses a player once only", () => {
-    const s = buildSquad([pl("A", ["DM", "AM"], 150)]);
+    const s = buildSquad([pl("A", ["DM", "AMC"], 150)]);
     expect(s.filter((x) => x.xi)).toHaveLength(1);
   });
   it("maps main position and keeps everyone, subs off the pitch", () => {

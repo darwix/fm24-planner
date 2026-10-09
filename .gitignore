@@ -3,3 +3,4 @@ dist
 savelens
 *.fm
 savelens-src
+my-server.log

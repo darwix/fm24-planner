@@ -1,7 +1,6 @@
 import useSWR from "swr";
-import type { Candidate, PoolPlayer } from "@/models/player";
 import type { ApiPlayer, ImportJob, SaveFile, Snapshot } from "@/models/save";
-import { api, apiFetcher, mockFetcher } from "./api";
+import { api, apiFetcher } from "./api";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -35,19 +34,22 @@ export const searchPlayers = async (
 ): Promise<{ players: ApiPlayer[]; total: number }> =>
   (await api.get(`/api/snapshots/${snap}/players`, { params })).data;
 
-export function useMock<T>(name: "cands" | "pool") {
-  const { data } = useSWR<T[]>(`/${name}.json`, mockFetcher);
+// null params = do not fetch
+export function useSearch(
+  snap: string | undefined,
+  params: Record<string, string | number> | null,
+) {
+  const { data } = useSWR<ApiPlayer[]>(
+    snap && params ? [`/api/snapshots/${snap}/players`, params] : null,
+    ([url, p]: [string, Record<string, string | number>]) =>
+      api.get(url, { params: p }).then((r) => r.data.players),
+  );
   return data;
 }
-export const useCands = () => useMock<Candidate>("cands");
-export const usePool = () => useMock<PoolPlayer>("pool");
 
-export interface RealPlayer {
+export interface RealPlayer extends ApiPlayer {
   clubId: number;
-  club: string;
-  nationalities: string[];
   attributes: Record<string, number>;
-  positions: string[];
 }
 export const useRealPlayer = (snap?: string, id?: number | string) =>
   useSWR<RealPlayer>(

@@ -1,24 +1,33 @@
-import { useNavigate } from "react-router-dom";
-import { useRecoilState } from "recoil";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useRecoilState, useRecoilValue } from "recoil";
 import { listIndexState, listsState } from "@/atoms/scoutState";
-import { squadState } from "@/atoms/squadState";
+import { clubState, squadState } from "@/atoms/squadState";
 import type { PoolPlayer, ScoutFilter } from "@/models/player";
-import { usePool } from "@/services/save";
-import { money } from "@/utils/format";
+import { useSearch } from "@/services/save";
+import { money, wage } from "@/utils/format";
 import { matchFilter } from "@/utils/logic";
+import { POS_INDEX, toPool } from "@/utils/player";
 
 export default function Scouting() {
   const nav = useNavigate();
   const [lists, setLists] = useRecoilState(listsState);
   const [li, setLi] = useRecoilState(listIndexState);
   const [squad, setSquad] = useRecoilState(squadState);
-  const pool = usePool() ?? [];
+  const club = useRecoilValue(clubState);
   const L = lists[li] ?? lists[0];
   const f = L.f;
-  const positions = [...new Set(pool.map((p) => p.p))];
-  const rows = pool
-    .filter((p) => matchFilter(p, f))
-    .sort((a, b) => b.pa - a.pa);
+  // the backend ranks by potential; expiry and value are filtered here
+  const found = useSearch(club?.snapshotId, {
+    ...(f.pos && { position: POS_INDEX[f.pos] }),
+    ageMin: f.min,
+    ageMax: f.max,
+    sort: "pa",
+    limit: 250,
+  });
+  if (!club) return <Navigate to="/upload" replace />;
+  const rows = (found ?? [])
+    .map((p) => toPool(p, club.gameDate))
+    .filter((p) => matchFilter(p, f));
   const patch = (next: Partial<ScoutFilter>) =>
     setLists(
       lists.map((l, i) => (i === li ? { ...l, f: { ...l.f, ...next } } : l)),
@@ -29,12 +38,14 @@ export default function Scouting() {
     setSquad([
       ...squad,
       {
+        id: p.id,
         n: p.n,
         p: p.p,
         a: p.a,
         ca: p.ca,
         pa: p.pa,
-        c: 2052 + Math.ceil(p.left / 12),
+        c: p.c,
+        left: p.left,
         v: p.v,
         w: p.w,
         at: {},
@@ -56,7 +67,6 @@ export default function Scouting() {
               onClick={() => setLi(i)}
             >
               {l.name}
-              <small>{pool.filter((p) => matchFilter(p, l.f)).length}</small>
               {!l.fixed && (
                 <span
                   className="x"
@@ -108,7 +118,9 @@ export default function Scouting() {
           )}
         </h2>
         <div className="sub">
-          {rows.length} players · ranked by potential
+          {found
+            ? `${rows.length} players · top 250 by potential`
+            : "Searching…"}
           {L.fixed ? " · preset" : ""}
         </div>
         <div className="cr">
@@ -119,7 +131,7 @@ export default function Scouting() {
               onChange={(e) => patch({ pos: e.target.value })}
             >
               <option value="">Any</option>
-              {positions.map((x) => (
+              {Object.keys(POS_INDEX).map((x) => (
                 <option key={x}>{x}</option>
               ))}
             </select>
@@ -141,7 +153,7 @@ export default function Scouting() {
             </span>
           </label>
           <label>
-            Max value (€M)
+            Max value (£M)
             <input
               type="number"
               value={f.val}
@@ -178,9 +190,9 @@ export default function Scouting() {
           <tbody>
             {rows.map((p) => (
               <tr
-                key={p.n}
+                key={p.id}
                 className="cl"
-                onClick={() => nav(`/player/${encodeURIComponent(p.n)}`)}
+                onClick={() => nav(`/player/${p.id}`)}
               >
                 <td className="pa">{p.pa}</td>
                 <td>
@@ -196,15 +208,15 @@ export default function Scouting() {
                 <td>{p.ca}</td>
                 <td
                   style={
-                    p.left <= 12
+                    p.left !== undefined && p.left <= 12
                       ? { color: "var(--warn)", fontWeight: 600 }
                       : undefined
                   }
                 >
-                  {p.left} months
+                  {p.left === undefined ? "n/a" : `${p.left} months`}
                 </td>
                 <td className="r">{money(p.v)}</td>
-                <td className="r">€{p.w}k</td>
+                <td className="r">{wage(p.w)}</td>
                 <td className="r">
                   <button
                     className="btn"
@@ -218,7 +230,7 @@ export default function Scouting() {
                 </td>
               </tr>
             ))}
-            {!rows.length && (
+            {found && !rows.length && (
               <tr>
                 <td colSpan={10} className="sub" style={{ padding: 24 }}>
                   No players match.

@@ -12,7 +12,7 @@ export const TARGET: Record<string, number> = {
   DC: 4,
   DL: 2,
   DM: 2,
-  AM: 2,
+  AMC: 2,
   AMR: 2,
   AML: 2,
   ST: 2,
@@ -28,25 +28,29 @@ export const matchFilter = (
   (!f.pos || p.p === f.pos) &&
   p.a >= f.min &&
   p.a <= f.max &&
-  (!f.exp || p.left <= 12) &&
-  (!f.val || p.v <= f.val);
+  (!f.exp || (p.left !== undefined && p.left <= 12)) &&
+  (!f.val || (p.v !== undefined && p.v <= f.val));
 
-// ponytail: placeholder match formula, replace once real profile matching exists
+// ponytail: match = how close CA is to the player being replaced; attribute-profile matching comes later
 export const asCandidate = (
   p: Pick<PoolPlayer, "ca" | "pa" | "left" | "v"> & Partial<PoolPlayer>,
+  targetCa?: number,
 ): Candidate => {
   const tags: Tag[] = [
-    ...(p.left <= 12 ? (["exp"] as Tag[]) : []),
-    ...(p.v <= 5 ? (["cheap"] as Tag[]) : []),
+    ...(p.left !== undefined && p.left <= 12 ? (["exp"] as Tag[]) : []),
+    ...(p.v !== undefined && p.v <= 5 ? (["cheap"] as Tag[]) : []),
   ];
   return {
     ...(p as PoolPlayer),
-    m: Math.min(99, Math.round((p.ca * 0.6 + p.pa * 0.4) / 1.6)),
+    m:
+      targetCa === undefined
+        ? Math.min(99, Math.round((p.ca * 0.6 + p.pa * 0.4) / 1.6))
+        : Math.max(1, Math.min(99, 100 - 2 * Math.abs(p.ca - targetCa))),
     tags,
   };
 };
 
-export const contractLabel = (left: number, end: number) =>
-  left <= 12 ? `${left} months left` : `to ${end}`;
+export const contractLabel = (left?: number, end?: number) =>
+  left === undefined ? "n/a" : left <= 12 ? `${left} months left` : `to ${end}`;
 
 export const isFmFile = (name: string) => /\.fm$/i.test(name);

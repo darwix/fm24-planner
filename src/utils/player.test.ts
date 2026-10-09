@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthsLeft, toPool, uiPos } from "./player";
+import { monthsLeft, toPool } from "./player";
 
 describe("monthsLeft", () => {
   it("counts whole months from the game date to the contract end", () => {
@@ -15,13 +15,6 @@ describe("monthsLeft", () => {
   it("is undefined when the contract is unknown", () => {
     expect(monthsLeft(null, "2053-02-18")).toBeUndefined();
     expect(monthsLeft(undefined, "2053-02-18")).toBeUndefined();
-  });
-});
-
-describe("uiPos", () => {
-  it("renames the backend's AMC to the UI's AM and keeps the rest", () => {
-    expect(uiPos("AMC")).toBe("AM");
-    expect(uiPos("DC")).toBe("DC");
   });
 });
 
@@ -49,11 +42,11 @@ describe("toPool", () => {
       a: 28,
       v: 96.4,
       w: 455,
-      left: 39,
+      left: 40,
     });
   });
-  it("uses the first position and maps it to the UI name", () => {
-    expect(toPool({ ...api, positions: ["AMC"] }, "2053-02-18").p).toBe("AM");
+  it("uses the first position as the backend names it", () => {
+    expect(toPool({ ...api, positions: ["AMC"] }, "2053-02-18").p).toBe("AMC");
   });
   it("leaves contract, value and wage undefined when the save has none", () => {
     const p = toPool(

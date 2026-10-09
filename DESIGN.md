@@ -57,7 +57,7 @@ Rules: one accent (green). Orange and red are status only. Greys stay warm.
 ## Content
 
 - Money: `€1.2M`, `€900k`; wage `€38k/wk`; contract as "7 months left" when within 12 months, otherwise the end year.
-- Positions shown by code (GK, DR, DC, DL, DM, AM, AMR, AML, ST); section titles spell them out.
+- Positions shown by code (GK, DR, DC, DL, DM, AMC, AMR, AML, ST); section titles spell them out.
 - Errors are plain and inline, no `alert()`.
 
 ## Accessibility to do in the real app

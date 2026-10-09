@@ -50,6 +50,11 @@ describe("asCandidate", () => {
     expect(c.tags).toEqual(["exp", "cheap"]);
     expect(asCandidate({ ca: 100, pa: 100, left: 13, v: 6 }).tags).toEqual([]);
   });
+  it("scores by CA closeness to the player being replaced", () => {
+    expect(asCandidate({ ca: 150, pa: 160 }, 150).m).toBe(99);
+    expect(asCandidate({ ca: 140, pa: 160 }, 150).m).toBe(80);
+    expect(asCandidate({ ca: 20, pa: 160 }, 150).m).toBe(1);
+  });
   it("caps the match score at 99", () => {
     expect(asCandidate({ ca: 200, pa: 200, left: 1, v: 1 }).m).toBe(99);
   });

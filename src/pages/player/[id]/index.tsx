@@ -1,66 +1,46 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { clubState, squadState } from "@/atoms/squadState";
-import { useAttributeCatalog, usePool, useRealPlayer } from "@/services/save";
-import { money } from "@/utils/format";
-import { GROUPS, fakeAttr } from "@/utils/placeholder";
+import { useAttributeCatalog, useRealPlayer } from "@/services/save";
+import { money, wage } from "@/utils/format";
+import { contractLabel } from "@/utils/logic";
+import { toPool } from "@/utils/player";
 
 const tone = (v: number) => (v >= 14 ? "v-hi" : v >= 11 ? "v-mid" : "");
 const SHOWN = ["Technical", "Mental", "Physical"];
 
 export default function Player() {
   const nav = useNavigate();
-  const name = decodeURIComponent(useParams().name ?? "");
+  const id = useParams().id;
   const [squad, setSquad] = useRecoilState(squadState);
   const club = useRecoilValue(clubState);
-  const pool = usePool();
-  const own = squad.find((s) => s.n === name);
-  const scouted = pool?.find((x) => x.n === name);
-  const real = useRealPlayer(club?.snapshotId, own?.id);
+  const real = useRealPlayer(club?.snapshotId, id);
   const catalog = useAttributeCatalog();
+  const own = squad.find((s) => String(s.id) === id);
 
-  if (!own && !scouted)
+  if (!real.data)
     return (
       <section className="pd">
-        {pool ? "Player not found." : "Loading…"}
+        {real.error ? "Player not found." : "Loading…"}
       </section>
     );
 
-  const back = own ? "← Back to squad" : "← Back to scouting";
-  const p = own
-    ? {
-        cl: real.data?.club ?? club?.name ?? "",
-        nat: real.data?.nationalities?.[0] ?? "",
-        p: own.p,
-        a: own.a,
-        ca: own.ca,
-        pa: own.pa,
-        left: undefined as number | undefined,
-        v: own.v,
-        w: own.w,
-      }
-    : { ...scouted!, left: scouted!.left as number | undefined };
-
-  // own players use parsed attributes; scouted ones are placeholders
-  const groups: [string, [string, number][]][] = own
-    ? SHOWN.concat(own.p === "GK" ? ["Goalkeeping"] : []).map((g) => [
-        g,
-        (catalog.data?.attributes ?? [])
-          .filter((a) => a.group === g)
-          .map((a): [string, number] => [
-            a.label,
-            real.data?.attributes[a.key] ?? 0,
-          ]),
-      ])
-    : Object.entries(GROUPS).map(([g, l]) => [
-        g,
-        l.map((a): [string, number] => [a, fakeAttr(scouted!, a)]),
-      ]);
+  const r = real.data;
+  const q = toPool(r, club?.gameDate ?? "");
+  const p = { ...q, p: own?.p ?? q.p }; // keep the squad slot position
+  const groups = SHOWN.concat(p.p === "GK" ? ["Goalkeeping"] : []).map(
+    (g): [string, [string, number][]] => [
+      g,
+      (catalog.data?.attributes ?? [])
+        .filter((a) => a.group === g)
+        .map((a): [string, number] => [a.label, r.attributes[a.key] ?? 0]),
+    ],
+  );
 
   return (
     <section className="pd">
       <a className="btn" style={{ margin: "0 -14px" }} onClick={() => nav(-1)}>
-        {back}
+        {own ? "← Back to squad" : "← Back to scouting"}
       </a>
       <div className="top">
         <div>
@@ -68,7 +48,7 @@ export default function Player() {
             {p.cl}
             {p.nat ? ` · ${p.nat}` : ""}
           </div>
-          <h2>{name}</h2>
+          <h2>{p.n}</h2>
           <div className="sub" style={{ margin: 0 }}>
             {p.p} · {p.a} years
           </div>
@@ -88,14 +68,14 @@ export default function Player() {
                 : undefined
             }
           >
-            {p.left !== undefined ? `${p.left} months left` : "n/a"}
+            {contractLabel(p.left, p.c)}
           </b>
         </div>
         <div>
-          Value<b>{p.v !== undefined ? money(p.v) : "n/a"}</b>
+          Value<b>{money(p.v)}</b>
         </div>
         <div>
-          Wage<b>{p.w !== undefined ? `€${p.w}k/wk` : "n/a"}</b>
+          Wage<b>{wage(p.w)}</b>
         </div>
         <div>
           Age<b>{p.a}</b>
@@ -125,14 +105,16 @@ export default function Player() {
               setSquad([
                 ...squad,
                 {
-                  n: scouted!.n,
-                  p: scouted!.p,
-                  a: scouted!.a,
-                  ca: scouted!.ca,
-                  pa: scouted!.pa,
-                  c: 2052 + Math.ceil(scouted!.left / 12),
-                  v: scouted!.v,
-                  w: scouted!.w,
+                  id: p.id,
+                  n: p.n,
+                  p: p.p,
+                  a: p.a,
+                  ca: p.ca,
+                  pa: p.pa,
+                  c: p.c,
+                  left: p.left,
+                  v: p.v,
+                  w: p.w,
                   at: {},
                 },
               ]);

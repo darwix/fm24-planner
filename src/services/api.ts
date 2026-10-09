@@ -2,7 +2,6 @@ import axios from "axios";
 
 // the dev server proxies /api to the SaveLens backend (see vite.config.ts)
 export const api = axios.create({ baseURL: "" });
-export const mocksApi = axios.create({ baseURL: "/mocks" });
 
 const fail = (error: any) =>
   Promise.reject(
@@ -13,9 +12,6 @@ const fail = (error: any) =>
     ),
   );
 api.interceptors.response.use((r) => r, fail);
-mocksApi.interceptors.response.use((r) => r, fail);
 
 export const apiFetcher = (resource: string) =>
   api.get(resource).then((res) => res.data);
-export const mockFetcher = (resource: string) =>
-  mocksApi.get(resource).then((res) => res.data.content);

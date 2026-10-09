@@ -28,7 +28,7 @@ export default function Squad() {
           squad={squad}
           sel={sel}
           onSelect={setSel}
-          onDetails={(i) => nav(`/player/${encodeURIComponent(squad[i].n)}`)}
+          onDetails={(i) => nav(`/player/${squad[i].id}`)}
           onReplace={() => nav("/shortlist")}
           onRemove={() => {
             setSquad(squad.filter((_, i) => i !== sel));

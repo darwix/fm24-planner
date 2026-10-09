@@ -11,9 +11,13 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 4. Scouting: preset lists (promising youngsters 18-23, contract expiring) plus custom lists.
 5. Upload flow for the `.fm` save.
 
-## Status: React app built on the SaveLens backend; contract/value/wage still missing
+## Status: React app on a patched SaveLens backend (real wage, contract end, value)
 
-`src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to the SaveLens server on :4242 (`savelens/FM SaveLens 24/fm-savelens-24-server.exe`); its code is cloned privately in `savelens-src/` (gitignored, no licence). Real data: save list, import, club squad, player attributes. Still placeholder (`public/mocks/*.json`): shortlist candidates and scouting pool. Run: `npm run dev`, `npm test`, `npm run typecheck`.
+`src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to a SaveLens server on :4242.
+
+The shipped SaveLens exe does not expose contract data, so the private clone `savelens-src/` (gitignored, no licence, never publish) is patched: `native/parser/contract.rs` reads weekly wage (GBP, before tax), contract end and value (GBP) from the save; the search API returns `wage`, `contractEnd`, `value`. Build and run it instead of the shipped exe: `cd savelens-src && cargo build --release --bin fm-savelens-24-server`, then `target/release/fm-savelens-24-server.exe --no-open --port 4242`. Tests: `cargo test --release` (fixtures in `tests/fixtures`, real bytes of four players). Layout notes: wage = u32 after `[eid][team][00 x4]`, contract end = `(day,year)` 12 bytes after the u32 before an `FF FF FF FF` run, value = u32 right after the 54-byte attribute block. Not decoded: transfer-listed, loan-listed, sales value. Coverage is high for top players and thin for low-rated or unsigned ones.
+
+Frontend: save list, import, club squad, player page, shortlist (CA match, tags contract expiring <=12 months and cheap <=GBP 5M) and scouting all use live backend queries (top 250 per query; expiry and value filter client-side). Positions use the backend's labels (AMC, not AM). Money shows in GBP. Run: `npm run dev`, `npm test`, `npm run typecheck`.
 
 Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` and `c-compare.html` are rejected alternatives, `index.html` is the first rejected draft. Shared mock data is in `mock/data.js` (placeholder, not parsed from a save).
 
@@ -21,9 +25,9 @@ Mock lives in `mock/`. Chosen design is **A (`a-board.html`)**; `b-ledger.html` 
 
 - Top bar: club name, tabs Squad / Shortlist (count badge) / Scouting, "Load save" button.
 - `#/upload` (landing page): drop zone for `.fm`, simulated 4-step progress (reading, decompressing, parsing, building squad), summary, "Open squad". Rejects non-`.fm` with an inline error.
-- `#/squad`: pitch only (4-2-3-1: two DM left and right, one AM). Clicking a pitch player opens the right panel showing only that player's position group, with a Close button.
-  - Positions: GK, DR, DC, DL, DM, AM, AMR (right wing), AML (left wing), ST.
-  - Depth targets: GK 2, DR 2, DC 4, DL 2, DM 2, AM 2, AMR 2, AML 2, ST 2. Missing players show dashed "+ Add cover" slots (count `n/target`).
+- `#/squad`: pitch only (4-2-3-1: two DM left and right, one AMC). Clicking a pitch player opens the right panel showing only that player's position group, with a Close button.
+  - Positions: GK, DR, DC, DL, DM, AMC, AMR (right wing), AML (left wing), ST.
+  - Depth targets: GK 2, DR 2, DC 4, DL 2, DM 2, AMC 2, AMR 2, AML 2, ST 2. Missing players show dashed "+ Add cover" slots (count `n/target`).
   - Selected row has "Find replacement" and "Remove".
 - `#/short`: two modes.
   - Replacement: left card for the player replaced, right list ranked by match %, filter chips (contract expiring, transfer listed, cheap), attribute deltas vs the player replaced, "Swap in".

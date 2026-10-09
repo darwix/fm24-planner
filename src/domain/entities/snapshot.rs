@@ -1,6 +1,69 @@
-use super::{NamedId, ParsedSave, PlayerDetail, SnapshotMeta};
-use crate::domain::{countries::nation_name, text::normalize};
-use std::collections::{BTreeMap, BTreeSet};
+//! An imported save, stored as one SQLite file: its id, the summary kept with it, and the
+//! import ready to write.
+use super::{ParsedSave, PlayerDetail};
+use crate::{
+    domain::{countries::nation_name, text::normalize},
+    Error, Result,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+};
+
+/// Identifies an imported snapshot: a 64-character lowercase hex digest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SnapshotId(String);
+
+impl SnapshotId {
+    pub fn parse(id: &str) -> Result<Self> {
+        let valid = id.len() == 64
+            && id
+                .bytes()
+                .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c));
+        if !valid {
+            return Err(Error::query("Invalid snapshot."));
+        }
+        Ok(Self(id.to_owned()))
+    }
+}
+impl fmt::Display for SnapshotId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+/// An id with a display name, for the nation and club lists of a snapshot.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct NamedId {
+    pub id: u32,
+    pub name: String,
+}
+
+/// The summary of an imported save, stored with its snapshot. `stale` is not
+/// stored: it is worked out each time the snapshot is read.
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SnapshotMeta {
+    pub snapshot_id: String,
+    pub source_path: String,
+    pub source_name: String,
+    pub source_size: u64,
+    pub source_mtime: f64,
+    pub parser_version: String,
+    pub name: String,
+    pub game_date: String,
+    pub format_version: String,
+    pub player_count: usize,
+    pub diagnostics: Value,
+    pub warnings: Vec<String>,
+    pub imported_at: String,
+    pub nations: Vec<NamedId>,
+    pub clubs: Vec<NamedId>,
+    pub managed_club_id: Option<u32>,
+    pub stale: bool,
+}
 
 /// A player ready to be stored, with every derived value already worked out.
 pub struct PlayerRecord {

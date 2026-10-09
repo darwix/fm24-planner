@@ -78,3 +78,14 @@ fn year_2047_sentinel_is_not_an_expiry() {
         "2056-06-30",
     );
 }
+
+// Soldi: a false match one u32 later (start = low half of X, X = FFFFFFFF) decoded 2050-03-20.
+#[test]
+fn soldi_ignores_overlapping_false_expiry() {
+    check(
+        include_str!("fixtures/soldi.hex"),
+        621367,
+        25_886,
+        "2057-06-30",
+    );
+}

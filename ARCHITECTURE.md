@@ -19,12 +19,12 @@ infra ──▶ adapters ──▶ application ──▶ domain
 src/
 ├── main.rs                 parse args, start the server, wait for Ctrl+C
 ├── lib.rs                  module declarations and re-exports
+├── error.rs                Error and Result, shared by every layer
 ├── domain/                 what the app is about, no I/O
 │   ├── entities/           Player, ParsedSave, Job, Settings, SnapshotId, PlayerFilter, ...
 │   ├── catalog.rs          attributes and positions every player is rated on
 │   └── countries.rs        nation id to name
 ├── application/            what the app does
-│   ├── app_error.rs        Error and Result, shared by every layer
 │   └── use_cases/
 │       ├── ports.rs        traits the adapters implement
 │       ├── saves.rs        SaveUseCase: list saves, snapshot metadata

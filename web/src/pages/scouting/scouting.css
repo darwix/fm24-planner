@@ -65,3 +65,14 @@
 .tb tr.cl:hover {
   background: var(--card);
 }
+
+.find {
+  width: 100%;
+  margin: 12px 0 8px;
+  padding: 8px 12px;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+}

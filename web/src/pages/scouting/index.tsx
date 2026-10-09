@@ -8,7 +8,7 @@ import type { PoolPlayer, ScoutFilter } from "@/models/player";
 import { useSearchResult } from "@/services/save";
 import Brief from "@/components/Brief";
 import { money, wage } from "@/utils/format";
-import { scoutQuery, toPool } from "@/utils/player";
+import { nameQuery, scoutQuery, toPool } from "@/utils/player";
 
 export default function Scouting() {
   const nav = useNavigate();
@@ -19,9 +19,11 @@ export default function Scouting() {
   const L = lists[li] ?? lists[0];
   const f = L.f;
   // the backend filters and ranks by potential
+  const [text, setText] = useState("");
+  const searching = nameQuery(text);
   const result = useSearchResult(
     club?.snapshotId,
-    club ? scoutQuery(f, club.gameDate) : null,
+    club ? (searching ?? scoutQuery(f, club.gameDate)) : null,
   );
   const found = result?.players;
   const [list, setList] = useState(false);
@@ -125,6 +127,15 @@ export default function Scouting() {
           onList={() => setList(!list)}
           onStart={() => nav("/scouting/swipe")}
         />
+        {list && (
+          <input
+            type="search"
+            className="find"
+            placeholder="Search by name (ignores the filters above)"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        )}
         {list && (
           <table className="tb">
             <thead>

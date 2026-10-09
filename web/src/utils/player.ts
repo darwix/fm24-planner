@@ -35,6 +35,10 @@ export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
   limit: 250,
 });
 
+// name search ignores the list filters so any player can be found and compared
+export const nameQuery = (text: string) =>
+  text.trim() ? { q: text.trim(), sort: "pa", limit: 250 } : null;
+
 export const POS_INDEX: Record<string, number> = {
   GK: 0,
   DL: 2,

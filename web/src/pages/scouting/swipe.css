@@ -266,6 +266,14 @@
   gap: 16px;
   margin-top: 22px;
   align-items: center;
+  position: relative;
+}
+.controls .acts .round.sm {
+  position: absolute;
+  top: 8px;
+  right: 100%;
+  margin: 0 16px 0 0;
+  grid-template-columns: 1fr;
 }
 .round {
   display: grid;

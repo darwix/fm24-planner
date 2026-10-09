@@ -32,8 +32,9 @@ pub fn find(window: &[u8], eid: u32) -> Contract {
         let (day, year) = (u16(window, q + 12) & 511, u16(window, q + 14));
         let ok = (2020..=2100).contains(&u16(window, q - 4))
             && window[q - 2..q] == [0; 2]
-            && window[q + 4..q + 8] == [0xff; 4]
+            && (window[q + 4..q + 8] == [0xff; 4] || window[q + 8..q + 12] == [0xff; 4]) // an extra u32 can precede the run
             && u32(window, q) != u32::MAX // overlaps the previous candidate's FF run
+            && year >= u16(window, q - 4) // expiry never precedes the start
             && (1..=366).contains(&day)
             && (2020..=2100).contains(&year)
             && year != 2047; // 0x07FF: all-ones sentinel, not a date

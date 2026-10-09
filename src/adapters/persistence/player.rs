@@ -50,30 +50,24 @@ pub fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         );
         args.push(n.into());
     }
-    if !filter.main_positions.is_empty() {
-        clauses.push(format!(
-            "main_position IN ({})",
-            vec!["?"; filter.main_positions.len()].join(",")
-        ));
-        args.extend(
-            filter
-                .main_positions
-                .iter()
-                .map(|&i| SqlValue::from(i as i64)),
-        );
-    }
-    if !filter.exclude_ids.is_empty() {
-        clauses.push(format!(
-            "id NOT IN ({})",
-            vec!["?"; filter.exclude_ids.len()].join(",")
-        ));
-        args.extend(
-            filter
-                .exclude_ids
-                .iter()
-                .map(|&id| SqlValue::from(id as i64)),
-        );
-    }
+    // `column IN (?,?,..)` (or NOT IN) with one argument per value; nothing when empty.
+    let mut in_list = |condition: &str, values: Vec<i64>| {
+        if !values.is_empty() {
+            clauses.push(format!(
+                "{condition} ({})",
+                vec!["?"; values.len()].join(",")
+            ));
+            args.extend(values.into_iter().map(SqlValue::from));
+        }
+    };
+    in_list(
+        "main_position IN",
+        filter.main_positions.iter().map(|&i| i as i64).collect(),
+    );
+    in_list(
+        "id NOT IN",
+        filter.exclude_ids.iter().map(|&id| id as i64).collect(),
+    );
     if let Some(date) = &filter.contract_end_max {
         clauses.push("contract_end <= ?".into());
         args.push(date.clone().into());

@@ -26,5 +26,4 @@ web/.next/
 *.tsbuildinfo
 
 # fm planner
-savelens
-my-server.log
+mock/

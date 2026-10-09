@@ -174,10 +174,7 @@ fn read_members(
     index_start: u64,
     cancel: &CancelFlag,
 ) -> Result<(String, Vec<Member>)> {
-    let mut c = Cursor {
-        bytes: index,
-        pos: 0,
-    };
+    let mut c = Cursor::new(index);
     let name = c.text()?;
     let mut members = vec![];
     read_group(&mut c, "", index_start, &mut members, cancel)?;
@@ -207,7 +204,7 @@ fn read_group(
         check(cancel)?;
         let name = member_name(c, prefix)?;
         let (offset, stored, plain) = (c.u64()?, c.u64()?, c.u64()?);
-        c.take(ENTRY_PADDING)?;
+        c.field(ENTRY_PADDING)?;
         if offset
             .checked_add(stored)
             .and_then(|v| v.checked_add(HEADER))
@@ -272,33 +269,31 @@ fn decompress(bytes: &[u8], limit: usize, cancel: &CancelFlag) -> Result<Vec<u8>
     Ok(output)
 }
 
-/// Reads the index front to back.
-struct Cursor<'a> {
-    bytes: &'a [u8],
-    pos: usize,
-}
-impl<'a> Cursor<'a> {
-    fn take(&mut self, n: usize) -> Result<&'a [u8]> {
-        let end = self
-            .pos
-            .checked_add(n)
-            .filter(|&e| e <= self.bytes.len())
-            .ok_or_else(|| Error::new("TRUNCATED", "The save contains an incomplete record."))?;
-        let bytes = &self.bytes[self.pos..end];
-        self.pos = end;
-        Ok(bytes)
-    }
+/// The index, read front to back.
+type Cursor<'a> = std::io::Cursor<&'a [u8]>;
+
+/// Little-endian fields of the index, failing with `TRUNCATED` past its end.
+trait IndexRead {
+    fn field(&mut self, n: usize) -> Result<Vec<u8>>;
     fn u32(&mut self) -> Result<u32> {
-        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+        Ok(u32::from_le_bytes(self.field(4)?.try_into().unwrap()))
     }
     fn u64(&mut self) -> Result<u64> {
-        Ok(u64::from_le_bytes(self.take(8)?.try_into().unwrap()))
+        Ok(u64::from_le_bytes(self.field(8)?.try_into().unwrap()))
     }
     fn text(&mut self) -> Result<String> {
         let n = self.u32()? as usize;
         if n > MAX_TEXT {
             return Err(manifest("An archive name has an invalid length."));
         }
-        Ok(String::from_utf8_lossy(self.take(n)?).into_owned())
+        Ok(String::from_utf8_lossy(&self.field(n)?).into_owned())
+    }
+}
+impl IndexRead for Cursor<'_> {
+    fn field(&mut self, n: usize) -> Result<Vec<u8>> {
+        let mut bytes = vec![0; n];
+        self.read_exact(&mut bytes)
+            .map_err(|_| Error::new("TRUNCATED", "The save contains an incomplete record."))?;
+        Ok(bytes)
     }
 }

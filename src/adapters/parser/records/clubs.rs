@@ -91,7 +91,12 @@ pub fn team_lists(db: &[u8], clubs: &[Club]) -> HashMap<u32, u32> {
             .map_or(db.len(), |c| c.offset)
             .min(short_end + LIST_RANGE)
             .min(db.len().saturating_sub(16));
-        if let Some(teams) = (short_end + 8..limit).find_map(|at| team_list(db, at, &ids)) {
+        // most lists follow FF x4; a club id there is rarer and more often a false match
+        let find = |marker: &dyn Fn(u32) -> bool| {
+            (short_end + 8..limit).find_map(|at| team_list(db, at, marker))
+        };
+        let teams = find(&|x| x == u32::MAX).or_else(|| find(&|x| ids.contains(&x)));
+        if let Some(teams) = teams {
             for team in teams {
                 owners.entry(team).or_default().push(club.id);
             }
@@ -104,14 +109,12 @@ pub fn team_lists(db: &[u8], clubs: &[Club]) -> HashMap<u32, u32> {
         .collect()
 }
 
-/// The team list whose first number is at `at`, if the marker before it fits.
-fn team_list(db: &[u8], at: usize, ids: &HashSet<u32>) -> Option<Vec<u32>> {
+/// The team list whose first number is at `at`, if the u32 before `[00 00 00 count]` passes
+/// `marker`.
+fn team_list(db: &[u8], at: usize, marker: &dyn Fn(u32) -> bool) -> Option<Vec<u32>> {
     let count = db[at - 1] as usize;
     let before = u32(db, at - 8);
-    if db[at - 4..at - 1] != [0; 3]
-        || !(1..=4).contains(&count)
-        || !(before == u32::MAX || ids.contains(&before))
-    {
+    if db[at - 4..at - 1] != [0; 3] || !(1..=4).contains(&count) || !marker(before) {
         return None;
     }
     let teams: Vec<u32> = (0..count).map(|k| u32(db, at + 4 * k)).collect();

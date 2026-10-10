@@ -6,7 +6,7 @@ use crate::{
         json_body::JsonBody,
         response::{blocking, reply},
     },
-    domain::catalog::CATALOG,
+    domain::entities::CATALOG,
     VERSION,
 };
 use axum::{extract::State, response::Response, routing::get, Router};

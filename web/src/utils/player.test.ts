@@ -94,9 +94,9 @@ describe("scoutQuery", () => {
       "2053-09-30",
     );
   });
-  it("expired means free agents, and a price keeps unknown values", () => {
+  it("expired means no contract at any club, and a price keeps unknown values", () => {
     const q = scoutQuery({ ...f, con: -1, val: 5 }, "2053-03-01");
-    expect(q.club).toBe(-1);
+    expect(q).not.toHaveProperty("club");
     expect(q.noContract).toBe(1);
     expect(q.contractEndMax).toBeUndefined();
     expect(q.valueUnknown).toBe(1);

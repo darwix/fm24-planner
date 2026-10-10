@@ -221,6 +221,7 @@ fn roster(db: &[u8], from: usize, limit: usize, valid: &HashSet<u32>) -> Vec<u32
 }
 
 /// Each player's club, by the first rule that gives one:
+/// 0. the club whose record lists their ability team (`listed`, from `clubs::team_lists`),
 /// 1. the team record their ability block names,
 /// 2. a roster they are on (a first team wins over reserve and youth teams),
 /// 3. the club most contracts of their ability team name.
@@ -230,15 +231,21 @@ pub fn player_clubs(
     teams: &[Team],
     players: &[(u32, u32, Option<u32>)],
     clubs: &HashSet<u32>,
+    listed: &HashMap<u32, u32>,
 ) -> Vec<Option<u32>> {
     let by_ordinal: HashMap<_, _> = teams.iter().map(|t| (t.ordinal + 1, t)).collect();
     let squads = squads(teams);
     let mut found: Vec<_> = players
         .iter()
         .map(|&(person, team, _)| {
-            by_ordinal
+            // free agents (team u32::MAX) can still sit on a stale roster
+            if team == u32::MAX {
+                return None;
+            }
+            listed
                 .get(&team)
-                .and_then(|t| t.club)
+                .copied()
+                .or_else(|| by_ordinal.get(&team).and_then(|t| t.club))
                 .or_else(|| squads.get(&person).copied())
         })
         .collect();
@@ -246,7 +253,10 @@ pub fn player_clubs(
         .iter()
         .zip(&found)
         .filter(|(_, club)| club.is_none())
-        .filter_map(|(&(_, team, contract), _)| Some((team, contract?)))
+        // free agents (team u32::MAX) keep stale contract fields; they must stay clubless
+        .filter(|((_, team, _), _)| *team != u32::MAX)
+        // the contract's team field is a team ordinal + 1, like `team`; vote with that team's club
+        .filter_map(|(&(_, team, contract), _)| Some((team, by_ordinal.get(&contract?)?.club?)))
         .collect();
     let votes = club_by_contract(&rows, clubs);
     for (club, &(_, team, _)) in found.iter_mut().zip(players) {
@@ -273,7 +283,7 @@ fn squads(teams: &[Team]) -> HashMap<u32, u32> {
 }
 
 /// For teams whose own record names no club: the club most of their players' contracts name.
-/// `rows` are (team id, contract team field). A tie, or a field that is not a club, gives nothing.
+/// `rows` are (team id, club named by a player's contract). A tie, or a field that is not a club, gives nothing.
 pub fn club_by_contract(rows: &[(u32, u32)], clubs: &HashSet<u32>) -> HashMap<u32, u32> {
     let mut votes: HashMap<u32, HashMap<u32, u32>> = HashMap::new();
     for &(team, club) in rows.iter().filter(|r| clubs.contains(&r.1)) {

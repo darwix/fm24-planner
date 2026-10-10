@@ -28,6 +28,19 @@ pub struct Contract {
     pub value: Option<u32>,
 }
 
+impl Contract {
+    /// Drops the wage and end date of a contract the game no longer honours: a free agent's
+    /// leftover one (team u32::MAX) or one that ended before the game date (ISO dates).
+    pub fn expire_stale(self, team: u32, game_date: &str) -> Contract {
+        let ended = self.contract_end.as_deref().is_some_and(|end| end < game_date);
+        if team == u32::MAX || ended {
+            Contract { wage: None, contract_end: None, ..self }
+        } else {
+            self
+        }
+    }
+}
+
 /// How far before a person record its contract can sit.
 const WINDOW: usize = 800;
 

@@ -1,8 +1,5 @@
 mod support;
-use fm_savelens_backend::domain::{
-    catalog::CATALOG,
-    entities::{ParsedSave, Player},
-};
+use fm_savelens_backend::domain::entities::{ParsedSave, Player, CATALOG};
 use fm_savelens_backend::utils::cancel::CancelFlag;
 use serde_json::{json, Value};
 

@@ -43,6 +43,17 @@ pub fn display_name(first: &str, last: &str, common: Option<&str>) -> String {
     }
 }
 
+/// The name a nickname index points at: the common pool when it fits, the person's own first
+/// name when it repeats the first index (regens like "Francisco Miguel"), else the last-name
+/// pool ("Juanma"). u32::MAX is out of every pool, so no nickname.
+pub fn nickname(names: &Names, first: u32, common: u32) -> Option<&str> {
+    match common {
+        c if (c as usize) < names.common.len() => Names::pick(&names.common, c),
+        c if c == first => Names::pick(&names.first, c),
+        c => Names::pick(&names.last, c),
+    }
+}
+
 /// Finds every person record, then links each to its identity and other nationalities.
 pub fn find(db: &[u8], names: &Names, cancel: &CancelFlag) -> Result<Vec<Person>> {
     let mut people = scan(names.end, db.len().saturating_sub(100), cancel, |offset| {
@@ -125,10 +136,16 @@ fn read_person(db: &[u8], names: &Names, offset: usize) -> Option<Person> {
     }
     let tail = Tail::read(db, end).filter(Tail::plausible)?;
     let full_name = text(&db[offset + Head::SIZE..end])?;
+    let first = Names::pick(&names.first, head.first).unwrap_or("");
+    let last = Names::pick(&names.last, head.last).unwrap_or("");
+    // regens store no full-name string; first + last is their full name
+    let full_name = Some(full_name)
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| display_name(first, last, None));
     let name = Some(display_name(
-        Names::pick(&names.first, head.first).unwrap_or(""),
-        Names::pick(&names.last, head.last).unwrap_or(""),
-        Names::pick(&names.common, head.common),
+        first,
+        last,
+        nickname(names, head.first, head.common),
     ))
     .filter(|n| !n.is_empty())
     .unwrap_or_else(|| full_name.clone());

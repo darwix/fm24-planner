@@ -4,10 +4,7 @@ use fm_savelens_backend::{
     adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
     adapters::persistence::SqliteSnapshotRepository,
     application::use_cases::saves::SnapshotRepository,
-    domain::{
-        catalog::CATALOG,
-        entities::{NewSnapshot, SnapshotId, SnapshotMeta},
-    },
+    domain::entities::{NewSnapshot, SnapshotId, SnapshotMeta, CATALOG},
 };
 use serde_json::json;
 use std::fs;

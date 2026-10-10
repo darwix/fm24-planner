@@ -21,8 +21,7 @@ src/
 ├── lib.rs                  module declarations and re-exports
 ├── error.rs                Error and Result, shared by every layer
 ├── domain/                 what the app is about, no I/O
-│   ├── entities/           Player, ParsedSave, Job, Settings, SnapshotId, PlayerFilter, ...
-│   ├── catalog.rs          attributes and positions every player is rated on
+│   ├── entities/           Player, ParsedSave, Job, Settings, SnapshotId, PlayerFilter, Catalog, ...
 │   ├── text.rs             how names are compared in search
 │   └── countries.rs        nation id to name
 ├── application/            what the app does
@@ -59,6 +58,8 @@ Plain data and the rules that belong to it, with no framework or I/O.
   every derived value.
 - `SnapshotId`: a 64-character hex digest, validated once when parsed.
 - `SnapshotMeta`: the summary stored with a snapshot (source file, game date, nations, clubs).
+- `Catalog`, `Attribute`: the attributes and positions every player is rated on; `CATALOG` loads
+  them from `assets/attributes.json`.
 - `Job`, `Settings`, `SaveFile`, `SourceFile`.
 
 ## Application

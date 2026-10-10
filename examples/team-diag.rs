@@ -1,7 +1,7 @@
 // private diagnostic: why does a player with a contract have no club? read-only.
 use fm_savelens_backend::adapters::parser::{archive::Archive, bytes, records};
-use fm_savelens_backend::utils::cancel::CancelFlag;
 use std::{collections::HashMap, path::Path};
+use fm_savelens_backend::utils::cancel::CancelFlag;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let c = CancelFlag::new();
@@ -29,7 +29,9 @@ fn main() {
                 .map(|c| (&c.name, c.uid))
         );
         for at in 4..names.start - 70 {
-            if bytes::u32(&b, at + 14) == o && bytes::u32(&b, at + 22) == bytes::u32(&b, at + 18) {
+            if bytes::u32(&b, at + 14) == o
+                && bytes::u32(&b, at + 22) == bytes::u32(&b, at + 18)
+            {
                 println!(
                     "loose head at {at} owner {} b26={} pad={:?}",
                     bytes::u32(&b, at),

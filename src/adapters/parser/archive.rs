@@ -50,11 +50,13 @@ pub struct Archive {
     members: Vec<Member>,
 }
 
-struct Member {
-    name: String,
-    offset: u64,
-    stored: u64,
-    plain: u64,
+pub struct Member {
+    pub name: String,
+    pub offset: u64,
+    /// Size in the file.
+    pub stored: u64,
+    /// Size once decompressed.
+    pub plain: u64,
 }
 
 impl Archive {
@@ -80,6 +82,10 @@ impl Archive {
             ));
         }
         Ok(a)
+    }
+
+    pub fn members(&self) -> &[Member] {
+        &self.members
     }
 
     /// The data of member `name`, decompressed.

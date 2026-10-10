@@ -1,20 +1,20 @@
 // private reverse-engineering helper: dump raw bytes around one player. read-only.
 use fm_savelens_backend::adapters::parser::{archive::Archive, records};
+use fm_savelens_backend::utils::cancel::CancelFlag;
 use std::path::Path;
-use tokio_util::sync::CancellationToken;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let (path, id) = (&a[1], a[2].parse::<i64>().unwrap());
-    let c = CancellationToken::new();
+    let c = CancelFlag::new();
     let mut ar = Archive::open(Path::new(path), &c).unwrap();
     let b = ar.member("game_db.dat", &c).unwrap();
-    let names = records::names(&b, &c).unwrap();
-    let people = records::people(&b, &names, &c).unwrap();
-    let blocks = records::abilities(&b, names.end, &c).unwrap();
+    let names = records::names::find(&b, &c).unwrap();
+    let people = records::people::find(&b, &names, &c).unwrap();
+    let blocks = records::abilities::find(&b, names.end, &c).unwrap();
     let p = people.iter().find(|p| p.id == id).expect("no person");
     let ab = blocks
         .iter()
-        .find(|x| x.owner_id == id as u64)
+        .find(|x| x.person_id == id as u64)
         .expect("no ability");
     println!(
         "person {}..{} identity {} ability {}",

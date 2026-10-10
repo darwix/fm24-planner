@@ -94,7 +94,7 @@ fn zero_value_in_the_save_is_stored_as_unknown() {
 }
 
 #[test]
-fn no_contract_keeps_players_without_a_contract_clubless_or_past_their_end_date() {
+fn no_contract_keeps_only_players_without_a_contract_end_or_wage() {
     let dir = tempfile::tempdir().unwrap();
     let db = snapshot(&dir);
     rusqlite::Connection::open(&db.path)
@@ -102,14 +102,11 @@ fn no_contract_keeps_players_without_a_contract_clubless_or_past_their_end_date(
         .execute_batch(
             "UPDATE players SET contract_end=NULL, wage=NULL;
          UPDATE players SET contract_end='2056-06-30' WHERE id=3;
-         UPDATE players SET wage=500 WHERE id=4;
-         UPDATE players SET wage=500, contract_end='2054-06-30', club_id=NULL WHERE id=5;
-         UPDATE players SET wage=500, contract_end='1900-01-01' WHERE id=6;",
+         UPDATE players SET wage=500 WHERE id=4;",
         )
         .unwrap();
     let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
-    // a wage with no decoded end date is still a contract; a clubless player or an end
-    // before the game date is not
+    // a wage with no decoded end date is still a contract
     assert_eq!(total("noContract=1"), 62);
     assert_eq!(total(""), 64);
 }

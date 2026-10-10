@@ -1,22 +1,22 @@
 // private diagnostic: why does a player with a contract have no club? read-only.
-use fm_savelens_backend::adapters::parser::{archive::Archive, records};
+use fm_savelens_backend::adapters::parser::{archive::Archive, bytes, records};
 use std::{collections::HashMap, path::Path};
-use tokio_util::sync::CancellationToken;
+use fm_savelens_backend::utils::cancel::CancelFlag;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
-    let c = CancellationToken::new();
+    let c = CancelFlag::new();
     let mut ar = Archive::open(Path::new(&a[1]), &c).unwrap();
     let b = ar.member("game_db.dat", &c).unwrap();
-    let names = records::names(&b, &c).unwrap();
-    let people = records::people(&b, &names, &c).unwrap();
-    let blocks = records::abilities(&b, names.end, &c).unwrap();
-    let clubs = records::clubs(&b, names.start, &c).unwrap();
+    let names = records::names::find(&b, &c).unwrap();
+    let people = records::people::find(&b, &names, &c).unwrap();
+    let blocks = records::abilities::find(&b, names.end, &c).unwrap();
+    let clubs = records::clubs::find(&b, names.start, &c).unwrap();
     let valid = people
         .iter()
         .filter(|p| p.id >= 0)
         .map(|p| p.id as u32)
         .collect();
-    let teams = records::teams(&b, &clubs, names.start, &valid, &c).unwrap();
+    let teams = records::teams::find(&b, &clubs, names.start, &valid, &c).unwrap();
     let tm: HashMap<_, _> = teams.iter().map(|t| (t.ordinal + 1, t)).collect();
     if let Ok(o) = std::env::var("ORD") {
         let o: u32 = o.parse().unwrap();
@@ -29,23 +29,23 @@ fn main() {
                 .map(|c| (&c.name, c.uid))
         );
         for at in 4..names.start - 70 {
-            if records::u32(&b, at + 14) == o
-                && records::u32(&b, at + 22) == records::u32(&b, at + 18)
+            if bytes::u32(&b, at + 14) == o
+                && bytes::u32(&b, at + 22) == bytes::u32(&b, at + 18)
             {
                 println!(
                     "loose head at {at} owner {} b26={} pad={:?}",
-                    records::u32(&b, at),
+                    bytes::u32(&b, at),
                     b[at + 26],
                     &b[at + 4..at + 14]
                 );
             }
         }
         for at in 4..names.start - 70 {
-            if records::u32(&b, at + 14) == o && b[at + 26] == 10 && b[at + 4..at + 14] == [0; 10] {
+            if bytes::u32(&b, at + 14) == o && b[at + 26] == 10 && b[at + 4..at + 14] == [0; 10] {
                 println!(
                     "head at {at} owner {} uid {}",
-                    records::u32(&b, at),
-                    records::u32(&b, at + 18)
+                    bytes::u32(&b, at),
+                    bytes::u32(&b, at + 18)
                 );
                 for (i, ch) in b[at - 8..at + 40].chunks(16).enumerate() {
                     println!(
@@ -79,7 +79,7 @@ fn main() {
     }
     for id in &a[2..] {
         let id: u64 = id.parse().unwrap();
-        let ab = blocks.iter().find(|x| x.owner_id == id).unwrap();
+        let ab = blocks.iter().find(|x| x.person_id == id).unwrap();
         let pe = people.iter().find(|p| p.id == id as i64).unwrap();
         let w = &b[pe.offset.saturating_sub(800)..pe.offset];
         let needle = (id as u32).to_le_bytes();
@@ -90,7 +90,7 @@ fn main() {
                     && w[i + 16] == 1
                     && w[i + 18] == 0
             })
-            .map(|i| records::u32(w, i + 4))
+            .map(|i| bytes::u32(w, i + 4))
             .collect();
         println!(
             "  contract team fields {ct:?}; club_by_id {:?}",

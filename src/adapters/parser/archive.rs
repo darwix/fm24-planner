@@ -47,14 +47,14 @@ pub struct Archive {
     modified: SystemTime,
     compressed: bool,
     pub name: String,
-    members: Vec<Member>,
+    pub members: Vec<Member>,
 }
 
-struct Member {
-    name: String,
-    offset: u64,
-    stored: u64,
-    plain: u64,
+pub struct Member {
+    pub name: String,
+    pub offset: u64,
+    pub stored: u64,
+    pub plain: u64,
 }
 
 impl Archive {

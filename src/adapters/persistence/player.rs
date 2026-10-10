@@ -95,7 +95,8 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         args.push(date.clone().into());
     }
     if filter.no_contract {
-        clauses.push("contract_end IS NULL".into());
+        // a wage without a decoded end date is still a contract
+        clauses.push("contract_end IS NULL AND wage IS NULL".into());
     }
     match filter.club {
         Some(ClubFilter::Free) => clauses.push("club_id IS NULL".into()),

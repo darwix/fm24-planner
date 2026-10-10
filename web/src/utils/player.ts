@@ -20,14 +20,14 @@ const expiryCutoff = (now: string, months: number) => {
   return new Date(Date.UTC(y, m + months, d - 1)).toISOString().slice(0, 10);
 };
 
-// con: 0 any, -1 expired (free agents), N = contract ends within N months
+// con: 0 any, -1 expired (no contract, at a club or free), N = contract ends within N months
 export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
   ...(f.pos.length && {
     mainPosition: f.pos.map((x) => POS_INDEX[x]).join(","),
   }),
   ageMin: f.min,
   ageMax: f.max,
-  ...(f.con === -1 && { club: -1, noContract: 1 }),
+  ...(f.con === -1 && { noContract: 1 }),
   ...(f.con > 0 && { contractEndMax: expiryCutoff(gameDate, f.con) }),
   ...(f.val && { valueMax: f.val * 1_000_000 }),
   ...(f.val && f.con === -1 && { valueUnknown: 1 }),

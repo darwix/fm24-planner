@@ -17,7 +17,7 @@ const POSITIONS = Object.keys(SPOT);
 const PRICES = [0, 1, 5, 10, 20];
 const CONTRACTS: [number, string][] = [
   [0, "Any"],
-  [-1, "Expired (free agents)"],
+  [-1, "Expired"],
   [12, "Expiring ≤ 12 months"],
   [6, "≤ 6 months"],
 ];

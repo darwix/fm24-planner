@@ -246,6 +246,8 @@ pub fn player_clubs(
         .iter()
         .zip(&found)
         .filter(|(_, club)| club.is_none())
+        // free agents (team u32::MAX) keep stale contract fields; they must stay clubless
+        .filter(|((_, team, _), _)| *team != u32::MAX)
         .filter_map(|(&(_, team, contract), _)| Some((team, contract?)))
         .collect();
     let votes = club_by_contract(&rows, clubs);

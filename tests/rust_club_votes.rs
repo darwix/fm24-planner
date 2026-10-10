@@ -32,3 +32,14 @@ fn free_agents_get_no_club_from_votes() {
     let players = [(1, free, Some(641)), (2, free, Some(641)), (3, free, None)];
     assert_eq!(player_clubs(&[], &players, &clubs()), vec![None; 3]);
 }
+
+// A contract's team field is a team ordinal + 1, not a club id. Richard Laisney's squad (team
+// 19459, no record) votes 650: team ordinal 649 is Niort (471), while club id 650 is Beitar.
+#[test]
+fn contract_team_field_resolves_through_the_team_ordinal() {
+    use fm_savelens_backend::adapters::parser::records::teams::{player_clubs, Team};
+    let niort = Team { club: Some(471), ordinal: 649, kind: 100, members: vec![] };
+    let clubs = [471, 650].into();
+    let players = [(1, 19459, Some(650)), (2, 19459, Some(650)), (3, 19459, Some(19459))];
+    assert_eq!(player_clubs(&[niort], &players, &clubs), vec![Some(471); 3]);
+}

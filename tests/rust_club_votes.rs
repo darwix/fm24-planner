@@ -78,3 +78,21 @@ fn club_team_list_wins_over_a_misattached_roster() {
         vec![Some(2910)]
     );
 }
+
+// A player whose own team is none (u32::MAX) is a free agent in-game, even when a roster still
+// holds him (US Ansoise trialists).
+#[test]
+fn free_agent_on_a_roster_has_no_club() {
+    use fm_savelens_backend::adapters::parser::records::teams::{player_clubs, Team};
+    let ansoise = Team {
+        club: Some(5095),
+        ordinal: 7000,
+        kind: 100,
+        members: vec![1],
+    };
+    let players = [(1, u32::MAX, None)];
+    assert_eq!(
+        player_clubs(&[ansoise], &players, &[5095].into(), &Default::default()),
+        vec![None]
+    );
+}

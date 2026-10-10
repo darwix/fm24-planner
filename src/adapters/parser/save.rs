@@ -25,7 +25,7 @@ use crate::{
 };
 use std::{path::Path, time::Instant};
 
-pub const PARSER_VERSION: &str = "fm24-rust-19-fm";
+pub const PARSER_VERSION: &str = "fm24-rust-20-fm";
 
 pub fn parse_save(
     path: &Path,

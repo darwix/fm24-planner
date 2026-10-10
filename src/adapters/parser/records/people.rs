@@ -136,9 +136,15 @@ fn read_person(db: &[u8], names: &Names, offset: usize) -> Option<Person> {
     }
     let tail = Tail::read(db, end).filter(Tail::plausible)?;
     let full_name = text(&db[offset + Head::SIZE..end])?;
+    let first = Names::pick(&names.first, head.first).unwrap_or("");
+    let last = Names::pick(&names.last, head.last).unwrap_or("");
+    // regens store no full-name string; first + last is their full name
+    let full_name = Some(full_name)
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| display_name(first, last, None));
     let name = Some(display_name(
-        Names::pick(&names.first, head.first).unwrap_or(""),
-        Names::pick(&names.last, head.last).unwrap_or(""),
+        first,
+        last,
         nickname(names, head.first, head.common),
     ))
     .filter(|n| !n.is_empty())

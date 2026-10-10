@@ -93,3 +93,20 @@ fn a_list_far_after_the_names_counts_up_to_the_next_club() {
     let lists = team_lists(&db, &clubs);
     assert_eq!((lists[&33474], lists[&2040]), (1834, 1836));
 }
+
+// S. Gijón B: a club id then [00 00 00 01][30] comes before the real FF-marked list; the FF one
+// wins.
+#[test]
+fn an_ff_marked_list_beats_an_earlier_club_marked_one() {
+    let mut between = 5u32.to_le_bytes().to_vec();
+    between.extend([0, 0, 0, 1]);
+    between.extend(30u32.to_le_bytes());
+    between.extend([7u8; 12]);
+    let (db, clubs) = concat(vec![
+        record_after(1106, "S. Gijon B", &between, &[1295, 1296]),
+        record(5, "Five", &[9]),
+    ]);
+    let lists = team_lists(&db, &clubs);
+    assert!(!lists.contains_key(&30));
+    assert_eq!(lists[&1295], 1106);
+}

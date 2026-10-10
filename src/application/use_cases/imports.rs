@@ -161,6 +161,9 @@ impl SaveUseCase {
             self.snapshots.unpublish(&snapshot_id)?;
             return Err(error);
         }
+        // Older snapshots of this save are unreachable now. Pruning is best effort:
+        // the import already succeeded.
+        let _ = self.snapshots.prune(&snapshot_id, &file.to_string_lossy());
         let job = inner.jobs.get_mut(&active.id).unwrap();
         job.status = JobStatus::Complete;
         job.progress = 100;

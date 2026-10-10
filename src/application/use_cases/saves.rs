@@ -38,6 +38,9 @@ pub trait SnapshotRepository: Send + Sync {
     /// Drops the unpublished write of `job_id`, if any.
     fn discard(&self, job_id: &str) -> Result<()>;
     fn metadata(&self, id: &SnapshotId) -> Result<SnapshotMeta>;
+    /// Deletes the published snapshots of `source_path` other than `keep` and
+    /// returns how many went. Snapshots it cannot read or delete are left alone.
+    fn prune(&self, keep: &SnapshotId, source_path: &str) -> Result<usize>;
 }
 
 pub struct SaveUseCase {

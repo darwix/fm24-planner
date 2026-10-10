@@ -27,6 +27,7 @@ Frontend: save list, import, club squad, player page, shortlist (CA match, tags 
 - Filters added by us: `contractEndMax` (YYYY-MM-DD), `valueMax` (+ `valueUnknown=1` keeps players with no value), `mainPosition` (comma indices of the best-rated position), `excludeIds` (max 5000), `club=-1` (free agents), `ageMin/ageMax`, `sort=pa`, `page`.
 - `main_position` column = best-rated position. `positions[0]` (the UI's `p.p`) is NOT the main position.
 - A market value of 0 in the save means unknown: stored as NULL (PARSER_VERSION `fm24-rust-8-fm`).
+- Snapshots: one SQLite file per import in `<data>/snapshots/<id>.sqlite`, id = sha256(path|size|mtime|PARSER_VERSION). A successful import deletes the older snapshots of the same save path (best effort; a file still open on Windows goes on the next import).
 - Rust layout: `src/domain` (roles, rating_systems, hybrid), `src/adapters` (parser, storage), `src/services`, `src/error.rs`; `lib.rs` re-exports the old module names.
 
 ### Scouting flow in the React app

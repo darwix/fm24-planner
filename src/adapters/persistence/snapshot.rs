@@ -178,4 +178,24 @@ impl SnapshotRepository for SqliteSnapshotRepository {
     fn metadata(&self, id: &SnapshotId) -> Result<SnapshotMeta> {
         metadata(&open_snapshot(&snapshot_file(&self.dir, id)?)?)
     }
+    fn prune(&self, keep: &SnapshotId, source_path: &str) -> Result<usize> {
+        let keep = format!("{keep}.sqlite");
+        let mut removed = 0;
+        for entry in fs::read_dir(&self.dir)? {
+            let path = entry?.path();
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            if name == keep || !name.ends_with(".sqlite") || name.ends_with(".partial.sqlite") {
+                continue;
+            }
+            // The connection closes before the removal, which Windows needs. A
+            // snapshot still open elsewhere stays until the next import retries.
+            let source = open_snapshot(&path)
+                .and_then(|db| metadata(&db))
+                .map(|m| m.source_path);
+            if source.is_ok_and(|s| s == source_path) && fs::remove_file(&path).is_ok() {
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
 }

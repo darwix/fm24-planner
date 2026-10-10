@@ -41,6 +41,7 @@ pub fn build_all(
         .map(|((&(person, ability), contract), club_id)| {
             let club = club_id.and_then(|id| club_map.get(&id).map(|c| c.short_name.clone()));
             let age = |birth_date: &str| age(year, game_date, person.birth_year, birth_date);
+            let contract = contract.expire_stale(ability.team, game_date);
             build(person, ability, contract, club_id, club, age)
         })
         .collect()

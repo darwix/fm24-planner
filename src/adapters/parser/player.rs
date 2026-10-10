@@ -22,6 +22,7 @@ pub fn build_all(
     contracts: Vec<Contract>,
     teams: &[Team],
     clubs: &[Club],
+    listed: &HashMap<u32, u32>,
     year: u16,
     game_date: &str,
 ) -> Result<Vec<Player>> {
@@ -32,7 +33,7 @@ pub fn build_all(
         .map(|(&(person, ability), contract)| (person.id as u32, ability.team, contract.team))
         .collect();
     let club_map: HashMap<_, _> = clubs.iter().map(|c| (c.id, c)).collect();
-    let club_ids = teams::player_clubs(teams, &rows, &club_map.keys().copied().collect());
+    let club_ids = teams::player_clubs(teams, &rows, &club_map.keys().copied().collect(), listed);
     linked
         .pairs
         .iter()

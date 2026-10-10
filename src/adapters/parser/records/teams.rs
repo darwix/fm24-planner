@@ -221,6 +221,7 @@ fn roster(db: &[u8], from: usize, limit: usize, valid: &HashSet<u32>) -> Vec<u32
 }
 
 /// Each player's club, by the first rule that gives one:
+/// 0. the club whose record lists their ability team (`listed`, from `clubs::team_lists`),
 /// 1. the team record their ability block names,
 /// 2. a roster they are on (a first team wins over reserve and youth teams),
 /// 3. the club most contracts of their ability team name.
@@ -230,15 +231,17 @@ pub fn player_clubs(
     teams: &[Team],
     players: &[(u32, u32, Option<u32>)],
     clubs: &HashSet<u32>,
+    listed: &HashMap<u32, u32>,
 ) -> Vec<Option<u32>> {
     let by_ordinal: HashMap<_, _> = teams.iter().map(|t| (t.ordinal + 1, t)).collect();
     let squads = squads(teams);
     let mut found: Vec<_> = players
         .iter()
         .map(|&(person, team, _)| {
-            by_ordinal
+            listed
                 .get(&team)
-                .and_then(|t| t.club)
+                .copied()
+                .or_else(|| by_ordinal.get(&team).and_then(|t| t.club))
                 .or_else(|| squads.get(&person).copied())
         })
         .collect();

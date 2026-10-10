@@ -15,7 +15,14 @@ fn record(id: u32, name: &str, teams: &[u32]) -> (Vec<u8>, Club) {
         b.extend(t.to_le_bytes());
     }
     b.extend([0u8; 1200]);
-    let club = Club { id, uid: 1, name: name.into(), short_name: name.into(), nation: 0, offset: 0 };
+    let club = Club {
+        id,
+        uid: 1,
+        name: name.into(),
+        short_name: name.into(),
+        nation: 0,
+        offset: 0,
+    };
     (b, club)
 }
 
@@ -31,14 +38,23 @@ fn concat(parts: Vec<(Vec<u8>, Club)>) -> (Vec<u8>, Vec<Club>) {
 
 #[test]
 fn each_listed_team_maps_to_its_club() {
-    let (db, clubs) = concat(vec![record(2910, "AS Vitré", &[3148, 20055, 34615]), record(650, "Beitar", &[829, 31620])]);
+    let (db, clubs) = concat(vec![
+        record(2910, "AS Vitré", &[3148, 20055, 34615]),
+        record(650, "Beitar", &[829, 31620]),
+    ]);
     let lists = team_lists(&db, &clubs);
-    assert_eq!((lists[&3148], lists[&34615], lists[&829]), (2910, 2910, 650));
+    assert_eq!(
+        (lists[&3148], lists[&34615], lists[&829]),
+        (2910, 2910, 650)
+    );
 }
 
 #[test]
 fn a_team_listed_by_two_clubs_is_left_out() {
-    let (db, clubs) = concat(vec![record(1, "One", &[500]), record(2, "Two", &[500, 501])]);
+    let (db, clubs) = concat(vec![
+        record(1, "One", &[500]),
+        record(2, "Two", &[500, 501]),
+    ]);
     let lists = team_lists(&db, &clubs);
     assert!(!lists.contains_key(&500));
     assert_eq!(lists[&501], 2);

@@ -71,13 +71,15 @@ fn read_club(db: &[u8], offset: usize, end: usize) -> Option<(Club, usize)> {
     Some((club, short_at + short_len))
 }
 
-/// How far after its short name a club's team list can sit.
-const LIST_RANGE: usize = 1200;
+/// How far after its short name a club's team list can sit. Short of the next club record, it
+/// can lie past a record the scan misses (A. Getxo's sits 18 KB on).
+const LIST_RANGE: usize = 40000;
 
 /// Team number (as players' ability blocks hold it) to the club whose record lists it. Teams
 /// that more than one club lists are left out.
 pub fn team_lists(db: &[u8], clubs: &[Club]) -> HashMap<u32, u32> {
-    let ids: HashSet<u32> = clubs.iter().map(|c| c.id).collect();
+    // id 0 is a club too, but zeros before [00 00 00 n] are padding, not a marker
+    let ids: HashSet<u32> = clubs.iter().map(|c| c.id).filter(|&id| id != 0).collect();
     let mut by_offset: Vec<_> = clubs.iter().collect();
     by_offset.sort_by_key(|c| c.offset);
     let mut owners: HashMap<u32, Vec<u32>> = HashMap::new();

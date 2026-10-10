@@ -238,6 +238,10 @@ pub fn player_clubs(
     let mut found: Vec<_> = players
         .iter()
         .map(|&(person, team, _)| {
+            // free agents (team u32::MAX) can still sit on a stale roster
+            if team == u32::MAX {
+                return None;
+            }
             listed
                 .get(&team)
                 .copied()

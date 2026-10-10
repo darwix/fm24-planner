@@ -1,3 +1,4 @@
+pub mod catalog;
 pub mod club;
 pub mod job;
 pub mod parsed_save;
@@ -9,6 +10,7 @@ pub mod settings;
 pub mod snapshot;
 pub mod source_file;
 
+pub use catalog::{Attribute, Catalog, CATALOG};
 pub use club::Club;
 pub use job::{Job, JobStatus};
 pub use parsed_save::ParsedSave;

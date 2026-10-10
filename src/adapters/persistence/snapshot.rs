@@ -1,10 +1,7 @@
 use crate::utils::cancel::CancelFlag;
 use crate::{
     application::use_cases::saves::SnapshotRepository,
-    domain::{
-        catalog::CATALOG,
-        entities::{NewSnapshot, SnapshotId, SnapshotMeta},
-    },
+    domain::entities::{NewSnapshot, SnapshotId, SnapshotMeta, CATALOG},
     utils::cancel::check,
     Error, Result,
 };

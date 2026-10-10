@@ -10,10 +10,7 @@ use super::{
     },
 };
 use crate::{
-    domain::{
-        catalog::CATALOG,
-        entities::{Club, Player},
-    },
+    domain::entities::{Club, Player, CATALOG},
     Result,
 };
 use serde_json::json;

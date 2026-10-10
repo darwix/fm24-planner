@@ -1,10 +1,7 @@
 //! Turns a player search request (query string or JSON body) into a validated `PlayerFilter`.
 use crate::{
+    domain::entities::{ClubFilter, PlayerFilter, PositionFilter, Range, SortKey, CATALOG},
     domain::text::normalize,
-    domain::{
-        catalog::CATALOG,
-        entities::{ClubFilter, PlayerFilter, PositionFilter, Range, SortKey},
-    },
     Error, Result,
 };
 use serde_json::Value;

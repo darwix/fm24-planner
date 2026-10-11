@@ -350,9 +350,14 @@ pub fn listed(wide: &[u8], person_id: u32) -> (bool, bool) {
     };
     let transfer = first >= LISTED_YEAR
         && (2000..=2100).contains(&u16(wide, first - LISTED_YEAR));
-    let loan = terms_block(wide, first)
-        .and_then(|at| wide.get(at + LISTING_FLAGS))
-        .is_some_and(|flags| flags & LOAN_LISTED != 0);
+    // out on loan, the first row is the parent club's contract, dated 01 .. (01 00 00 03,
+    // 01 01 01 01) instead of FF; the game's loan-listed search leaves those players out
+    let date = &wide[first + ROW_DATE..first + ROW_DATE + 4];
+    let on_loan = date[0] == 1 && date != BLANK_DATE;
+    let loan = !on_loan
+        && terms_block(wide, first)
+            .and_then(|at| wide.get(at + LISTING_FLAGS))
+            .is_some_and(|flags| flags & LOAN_LISTED != 0);
     (transfer, loan)
 }
 

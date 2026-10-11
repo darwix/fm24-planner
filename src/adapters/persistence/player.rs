@@ -98,7 +98,8 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         clauses.push("transfer_listed = 1".into());
     }
     if filter.loan_listed {
-        clauses.push("loan_listed = 1".into());
+        // like the game's search, leave out the managed club's own players
+        clauses.push("loan_listed = 1 AND coalesce(club_id, -1) != coalesce((SELECT json_extract(value, '$.managedClubId') FROM metadata WHERE key = 'snapshot'), -2)".into());
     }
     if filter.no_contract {
         // a wage without a decoded end date is still a contract

@@ -339,7 +339,7 @@ fn youth_start(window: &[u8], at: usize) -> bool {
 /// set values instead, Duncliffe), a start date after the end must not be later than it. The
 /// start year can be 1900 (unset: Simatos's youth deal, Sarı) when the FF run follows at once.
 fn standard_start(window: &[u8], at: usize) -> bool {
-    let (day, year) = (u16(window, at + YEAR + 2), u16(window, at + YEAR + 4));
+    let (day, year) = (u16(window, at + YEAR + 2) & 511, u16(window, at + YEAR + 4));
     let start = u16(window, at - START_YEAR);
     let unset = start == 1900 && window[at + FF_RUN..at + FF_RUN + 4] == [0xff; 4];
     ((2020..=2100).contains(&start) || unset)

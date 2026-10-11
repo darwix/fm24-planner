@@ -38,7 +38,7 @@ Every contract has a 28-byte block before its row:
 
 - `v1`, `v2` are `FF FF FF FF` when unset, otherwise amounts (clauses).
 - The year field is not always a start year (can be later than the end).
-- End day is a day of year; mask with 511.
+- End day is a day of year; mask with 511. So is the start day after it (Breant: `EF 32`).
 - The end is read from the block nearest before the first row.
 
 ## Special cases
@@ -75,11 +75,11 @@ Name, Club, Contract Type (F/PT), Salary, Expires. The test save's export has 54
    (max of £15 or 6%).
 4. Diff the new snapshot against the previous one; every changed player must be a fix.
 
-Baseline at `fm24-rust-46-fm` (54,308 matched): expired 100%; end 38,030 of 38,031; wage 38,019
+Baseline at `fm24-rust-47-fm` (54,308 matched): expired 100%; end 38,031 of 38,031; wage 38,019
 right, 87 month-to-month with no wage (by design), 0 wrong.
 
 ## Notes
 
 - In-game filtered exports (expired, unattached) can silently leave players out; the full export does not.
 - Wages are stored before display rounding (game shows £550,000 for 538,133).
-- Known misses: Jean-Baptiste Breant (Sassuolo) end 2054 vs game 2053; Carlos Villar's display name.
+- Known miss: Carlos Villar's display name ("Carlos").

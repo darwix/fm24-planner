@@ -139,6 +139,16 @@ pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
         return find(wide, person_id);
     }
     let anchor = wage_anchor(near, person_id).map(|at| skip + at);
+    // a blank-dated paid row can be another club's approach; an FF-dated paid row further back
+    // is the contract
+    if anchor.is_some_and(|at| wide[at + ROW_DATE..at + ROW_DATE + 4] == BLANK_DATE) {
+        let signed = rows(wide, person_id).find(|&r| {
+            r < skip && u32(wide, r + WAGE) > 0 && wide[r + ROW_DATE..r + ROW_DATE + 4] == [0xff; 4]
+        });
+        if let Some(at) = signed {
+            return contract_at(wide, at);
+        }
+    }
     let rolling = found.month_to_month || anchor.is_some_and(|at| month_to_month(wide, at));
     // a month-to-month deal has no end (an older block's would hide it); an amateur's old paid
     // row is not its contract
@@ -167,9 +177,11 @@ pub fn find(window: &[u8], person_id: u32) -> Contract {
             ..Contract::default()
         });
     }
-    let Some(anchor) = wage_anchor(window, person_id) else {
-        return Contract::default();
-    };
+    wage_anchor(window, person_id).map_or_else(Contract::default, |at| contract_at(window, at))
+}
+
+/// The contract whose paid row is at `anchor`.
+fn contract_at(window: &[u8], anchor: usize) -> Contract {
     Contract {
         wage: Some(u32(window, anchor + WAGE)),
         team: Some(u32(window, anchor + TEAM)),

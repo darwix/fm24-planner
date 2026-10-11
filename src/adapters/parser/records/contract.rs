@@ -138,10 +138,18 @@ pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
     if found.wage.is_none() && !amateur(near, person_id) {
         return find(wide, person_id);
     }
-    let rolling = found.month_to_month
-        || wage_anchor(near, person_id).is_some_and(|at| month_to_month(wide, skip + at));
+    let anchor = wage_anchor(near, person_id).map(|at| skip + at);
+    let rolling = found.month_to_month || anchor.is_some_and(|at| month_to_month(wide, at));
+    // a month-to-month deal has no end (an older block's would hide it); an amateur's old paid
+    // row is not its contract
+    let paid = found.wage.is_some() && !rolling;
+    let contract_end = found
+        .contract_end
+        .clone()
+        .or_else(|| anchor.filter(|_| paid).and_then(|at| terms_end(wide, at)));
     Contract {
         month_to_month: rolling,
+        contract_end,
         ..found
     }
 }
@@ -165,7 +173,8 @@ pub fn find(window: &[u8], person_id: u32) -> Contract {
     Contract {
         wage: Some(u32(window, anchor + WAGE)),
         team: Some(u32(window, anchor + TEAM)),
-        contract_end: contract_end(window, anchor),
+        contract_end: contract_end(window, anchor)
+            .or_else(|| (!month_to_month(window, anchor)).then(|| terms_end(window, anchor))?),
         value: None,
         month_to_month: month_to_month(window, anchor),
     }
@@ -259,6 +268,27 @@ fn unset_start_end(window: &[u8], anchor: usize) -> Option<String> {
         .rev()
         .filter(|&at| window[at - START_YEAR..at + 4] == [0x6c, 0x07, 0, 0, 0, 0, 0, 0])
         .find_map(|at| expiry(window, at))
+}
+
+/// Every terms block reads `[04 00 00 00][u32][year or 1900][00 00][x][v1][v2][end day][end
+/// year][start day][start year]`; v1 and v2 are FF when unset. The year field is not always a
+/// start year (Andrés Álvarez: 2054 before an end in 2053).
+const TERMS_LEN: usize = 28;
+const TERMS_END: usize = 24;
+
+/// The end in the nearest terms block before `anchor`.
+fn terms_end(window: &[u8], anchor: usize) -> Option<String> {
+    (0..anchor.saturating_sub(TERMS_LEN)).rev().find_map(|at| {
+        let field = u16(window, at + 8);
+        let (day, year) = (u16(window, at + TERMS_END) & 511, u16(window, at + TERMS_END + 2));
+        let block = window[at..at + 4] == [4, 0, 0, 0]
+            && (field == 1900 || (2000..=2100).contains(&field))
+            && window[at + 10..at + 12] == [0; 2]
+            && (1..=366).contains(&day)
+            && (2020..=2100).contains(&year)
+            && year != 2047;
+        block.then(|| date_of(year, day).ok()).flatten()
+    })
 }
 
 /// The expiry date if an expiry block has its `x` at `at`.

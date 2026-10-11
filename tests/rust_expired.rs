@@ -102,3 +102,25 @@ fn zero_wage_row_with_a_blank_date_keeps_the_paid_contract() {
     w.extend(row(431, 2923, [0x01, 0x00, 0x6c, 0x07]));
     assert_eq!(find(&w, id).wage, Some(2923));
 }
+
+// Austin Moses (Oldham, month-to-month): the end-1900 block is not the nearest one; a newer
+// dated block (2050-01-02 / 2050-01-20) sits between it and the wage row.
+#[test]
+fn month_to_month_block_need_not_be_the_nearest() {
+    use fm_savelens_backend::adapters::parser::records::contract::find;
+    let id: u32 = 530570;
+    let mut w = vec![0u8; 100];
+    w.extend([0xff; 8]);
+    w.extend([0x02, 0x00, 0x6c, 0x07, 0xc3, 0x00, 0x01, 0x08]); // end 1900, start 2049
+    w.extend([0u8; 20]);
+    w.extend([0xff; 8]);
+    w.extend([0x02, 0x00, 0x02, 0x08, 0x14, 0x00, 0x02, 0x08]); // 2050-01-02 / 2050-01-20
+    w.extend([0u8; 30]);
+    w.extend(id.to_le_bytes());
+    w.extend(1300u32.to_le_bytes());
+    w.extend([0; 4]);
+    w.extend(300u32.to_le_bytes());
+    w.extend([1, 0, 0, 0x01, 0x00, 0x6c, 0x07]);
+    w.extend([0u8; 30]);
+    assert!(find(&w, id).month_to_month);
+}

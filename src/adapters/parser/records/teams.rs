@@ -299,3 +299,13 @@ pub fn club_by_contract(rows: &[(u32, u32)], clubs: &HashSet<u32>) -> HashMap<u3
         })
         .collect()
 }
+
+/// Team number to club: the club lists first, then the team records.
+pub fn team_clubs(teams: &[Team], listed: &HashMap<u32, u32>) -> HashMap<u32, u32> {
+    let mut map: HashMap<u32, u32> = teams
+        .iter()
+        .filter_map(|t| Some((t.ordinal + 1, t.club?)))
+        .collect();
+    map.extend(listed);
+    map
+}

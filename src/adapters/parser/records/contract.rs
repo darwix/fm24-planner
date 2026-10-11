@@ -19,6 +19,7 @@ use crate::adapters::parser::{
 };
 use crate::utils::cancel::{check, CancelFlag};
 use crate::Result;
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Contract {
@@ -57,18 +58,52 @@ impl Contract {
 /// How far before a person record its contract can sit.
 const WINDOW: usize = 800;
 
-/// The contract and value of each linked person, in order.
-pub fn for_people(db: &[u8], linked: &Linked, cancel: &CancelFlag) -> Result<Vec<Contract>> {
+/// How far before a person record the row with their own club can sit.
+const OWN_WINDOW: usize = 3000;
+
+/// The contract and value of each linked person, in order. `team_club` maps a team number to
+/// its club, to find the row with the player's own club.
+pub fn for_people(
+    db: &[u8],
+    linked: &Linked,
+    team_club: &HashMap<u32, u32>,
+    cancel: &CancelFlag,
+) -> Result<Vec<Contract>> {
     let mut contracts = vec![];
     for &(person, ability) in &linked.pairs {
         check(cancel)?;
-        let window = &db[person.offset.saturating_sub(WINDOW)..person.offset];
+        let wide = &db[person.offset.saturating_sub(OWN_WINDOW)..person.offset];
+        let near = &wide[wide.len().saturating_sub(WINDOW)..];
+        let id = person.id as u32;
+        let own = team_club.get(&ability.team);
+        let non_contract = own
+            .is_some_and(|club| non_contract(wide, id, |team| team_club.get(&team) == Some(club)));
+        let found = if non_contract {
+            Contract::default()
+        } else {
+            find(near, id)
+        };
         contracts.push(Contract {
             value: value(db, ability.offset),
-            ..find(window, person.id as u32)
+            ..found
         });
     }
     Ok(contracts)
+}
+
+/// Contract type byte after a row's flags; 3 is a non-contract deal.
+const ROW_TYPE: usize = 25;
+const NON_CONTRACT: u8 = 3;
+
+/// A non-contract deal: the row with the player's own club (nearest the person, team passes
+/// `is_own`) has zero wage and contract type 3. A loan row at the borrowing club is type 1.
+pub fn non_contract(window: &[u8], person_id: u32, is_own: impl Fn(u32) -> bool) -> bool {
+    rows(window, person_id)
+        .filter(|&at| is_own(u32(window, at + TEAM)))
+        .last()
+        .is_some_and(|at| {
+            u32(window, at + WAGE) == 0 && window.get(at + ROW_TYPE) == Some(&NON_CONTRACT)
+        })
 }
 
 /// Market value: the u32 stored right after the attribute block that starts at `ability_offset`.

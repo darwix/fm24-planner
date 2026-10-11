@@ -25,7 +25,7 @@ use crate::{
 };
 use std::{path::Path, time::Instant};
 
-pub const PARSER_VERSION: &str = "fm24-rust-30-fm";
+pub const PARSER_VERSION: &str = "fm24-rust-31-fm";
 
 pub fn parse_save(
     path: &Path,
@@ -49,15 +49,11 @@ pub fn parse_save(
     progress(68, "Resolving clubs and squads");
     let clubs = clubs::find(&db, pools.start, cancel)?;
     let teams = teams::find(&db, &clubs, pools.start, &people::ids(&people), cancel)?;
-    let contracts = contract::for_people(&db, &linked, cancel)?;
+    let listed = clubs::team_lists(&db, &clubs, &teams);
+    let team_club = teams::team_clubs(&teams, &listed);
+    let contracts = contract::for_people(&db, &linked, &team_club, cancel)?;
     let players = player::build_all(
-        &linked,
-        contracts,
-        &teams,
-        &clubs,
-        &clubs::team_lists(&db, &clubs, &teams),
-        year,
-        &game_date,
+        &linked, contracts, &teams, &clubs, &listed, year, &game_date,
     )?;
     let managed_club_id = meta::managed_club(&mut archive, &clubs, &players, cancel);
     report::validate(&players, &archive)?;

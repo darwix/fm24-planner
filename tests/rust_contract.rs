@@ -251,3 +251,12 @@ fn a_player_out_on_loan_is_not_loan_listed() {
     let jose_alberto = bytes(include_str!("fixtures/jose_alberto.hex"));
     assert_eq!(listed(&jose_alberto, 478100), (false, false));
 }
+
+// Antonio Guimaraes (Tottenham, on loan from OL) is transfer listed, but the game's listed
+// searches leave players out on loan out, so neither flag counts.
+#[test]
+fn a_player_out_on_loan_is_not_transfer_listed() {
+    use fm_savelens_backend::adapters::parser::records::contract::listed;
+    let guimaraes = bytes(include_str!("fixtures/guimaraes.hex"));
+    assert_eq!(listed(&guimaraes, 390394).0, false);
+}

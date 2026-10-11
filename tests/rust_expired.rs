@@ -253,3 +253,24 @@ fn type_3_own_club_row_without_ff_is_a_loan() {
     w.extend([0u8; 60]);
     assert!(!non_contract(&w, id, |team| team == 1237));
 }
+
+// Julian Lübcke (Kapfenberger SV, month-to-month): his wage row sits 794 bytes before his
+// person record, so the marker 47 bytes before that row lies outside the 800-byte window.
+#[test]
+fn month_to_month_marker_before_the_window_still_counts() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let id: u32 = 512658;
+    let mut w = vec![0u8; 1000];
+    w.extend([0xff; 4]);
+    w.extend([0x02, 0x00, 0x6c, 0x07, 0x48, 0x00, 0xfc, 0x07]); // end 1900, start 2044
+    w.extend([0u8; 35]);
+    w.extend(id.to_le_bytes());
+    w.extend(3095u32.to_le_bytes());
+    w.extend([0; 4]);
+    w.extend(140u32.to_le_bytes());
+    w.extend([1, 0, 0]);
+    w.extend(vec![0u8; 794 - 19]);
+    let c = find_wide(&w, id);
+    assert_eq!(c.wage, Some(140));
+    assert!(c.month_to_month);
+}

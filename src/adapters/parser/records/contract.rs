@@ -97,7 +97,8 @@ const NON_CONTRACT: u8 = 3;
 /// A non-contract deal: the row with the player's own club (nearest the person, team passes
 /// `is_own`) has zero wage, FF where a paid row has its date, and either contract type 3 or
 /// sits beyond the usual window with a released-style tail (FF FF ?? 00 or FF x4; Cayón B
-/// youths). A loan row at the borrowing club has a date there (blank, or 03 2F .. for Ortega).
+/// youths) with no paid row before it. A loan row at the borrowing club has a date there
+/// (blank, or 03 2F .. for Ortega).
 // ponytail: the far-row rule is fitted on 5 players of one save (1 false hit); widen or drop it
 // once more saves are checked against the game.
 pub fn non_contract(window: &[u8], person_id: u32, is_own: impl Fn(u32) -> bool) -> bool {
@@ -109,9 +110,14 @@ pub fn non_contract(window: &[u8], person_id: u32, is_own: impl Fn(u32) -> bool)
             let released = window
                 .get(at + ROW_DATE..at + ROW_DATE + 4)
                 .is_some_and(|t| t[..2] == [0xff; 2] && (t[3] == 0 || t == [0xff; 4]));
+            // a paid row before the far one is the real contract (Sirera)
+            let paid_before = rows(window, person_id)
+                .take_while(|&r| r < at)
+                .any(|r| u32(window, r + WAGE) > 0);
             u32(window, at + WAGE) == 0
                 && window.get(at + ROW_DATE) == Some(&0xff)
-                && (window.get(at + ROW_TYPE) == Some(&NON_CONTRACT) || (far && released))
+                && (window.get(at + ROW_TYPE) == Some(&NON_CONTRACT)
+                    || (far && released && !paid_before))
         })
 }
 

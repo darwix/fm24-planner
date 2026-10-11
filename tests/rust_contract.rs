@@ -161,3 +161,10 @@ fn simatos_unset_start_year() {
         "2053-06-30",
     );
 }
+
+// Sarı (Bodø/Glimt): full time at £0 until 2054-12-31. The zero-wage row looks amateur, but the
+// terms block holds an end (start year 1900, unset).
+#[test]
+fn sari_zero_wage_contract_with_an_end() {
+    check(include_str!("fixtures/sari.hex"), 657818, 0, "2054-12-31");
+}

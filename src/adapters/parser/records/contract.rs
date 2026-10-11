@@ -143,7 +143,15 @@ pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
 /// Wage, team and contract end from `window`, the bytes before the person record.
 pub fn find(window: &[u8], person_id: u32) -> Contract {
     if amateur(window, person_id) {
-        return Contract::default();
+        // an unset-start terms block with an end makes it a contract at no wage (Sarı), not an
+        // amateur deal
+        let first = rows(window, person_id).next().unwrap_or_default();
+        return unset_start_end(window, first).map_or_else(Contract::default, |end| Contract {
+            wage: Some(0),
+            team: Some(u32(window, first + TEAM)),
+            contract_end: Some(end),
+            ..Contract::default()
+        });
     }
     let Some(anchor) = wage_anchor(window, person_id) else {
         return Contract::default();
@@ -238,6 +246,15 @@ fn contract_end(window: &[u8], anchor: usize) -> Option<String> {
     expiry(window, at)
 }
 
+/// The expiry date nearest before `anchor` whose block reads `[1900][00 00][x = 0][FF x4]`; other
+/// matches before a zero-wage row are noise (2086-01-01).
+fn unset_start_end(window: &[u8], anchor: usize) -> Option<String> {
+    (START_YEAR..anchor.saturating_sub(BEFORE_ANCHOR))
+        .rev()
+        .filter(|&at| window[at - START_YEAR..at + 4] == [0x6c, 0x07, 0, 0, 0, 0, 0, 0])
+        .find_map(|at| expiry(window, at))
+}
+
 /// The expiry date if an expiry block has its `x` at `at`.
 fn expiry(window: &[u8], at: usize) -> Option<String> {
     let (day, year) = (u16(window, at + DAY) & 511, u16(window, at + YEAR));
@@ -260,11 +277,11 @@ fn youth_start(window: &[u8], at: usize) -> bool {
 
 /// `[start year][00 00][x]` followed by the FF run, here or one u32 later. Without the run (two
 /// set values instead, Duncliffe), a start date after the end must not be later than it. The
-/// start year can be 1900 (unset, Simatos's youth deal) when eight FF bytes follow.
+/// start year can be 1900 (unset: Simatos's youth deal, Sarı) when the FF run follows at once.
 fn standard_start(window: &[u8], at: usize) -> bool {
     let (day, year) = (u16(window, at + YEAR + 2), u16(window, at + YEAR + 4));
     let start = u16(window, at - START_YEAR);
-    let unset = start == 1900 && window[at + FF_RUN..at + FF_RUN + 8] == [0xff; 8];
+    let unset = start == 1900 && window[at + FF_RUN..at + FF_RUN + 4] == [0xff; 4];
     ((2020..=2100).contains(&start) || unset)
         && window[at - 2..at] == [0; 2]
         && (window[at + FF_RUN..at + FF_RUN + 4] == [0xff; 4]

@@ -124,3 +124,22 @@ fn month_to_month_block_need_not_be_the_nearest() {
     w.extend([0u8; 30]);
     assert!(find(&w, id).month_to_month);
 }
+
+// Eyal Sitton (Maccabi Tel-Aviv, month-to-month): the end-1900 block sits about 340 bytes
+// before the wage row.
+#[test]
+fn month_to_month_block_can_sit_far_before_the_row() {
+    use fm_savelens_backend::adapters::parser::records::contract::find;
+    let id: u32 = 107923;
+    let mut w = vec![0u8; 100];
+    w.extend([0xff; 8]);
+    w.extend([0x02, 0x00, 0x6c, 0x07, 0x44, 0x00, 0xf6, 0x07]); // end 1900, start 2038
+    w.extend([0u8; 325]);
+    w.extend(id.to_le_bytes());
+    w.extend(840u32.to_le_bytes());
+    w.extend([0; 4]);
+    w.extend(202u32.to_le_bytes());
+    w.extend([1, 0, 0]);
+    w.extend([0u8; 30]);
+    assert!(find(&w, id).month_to_month);
+}

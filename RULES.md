@@ -59,7 +59,7 @@ Every contract has a 28-byte block before its row:
   Not for a player out on loan (see below); the `transferListed` search filter also leaves out
   the managed club's players. Then 1,054 match the game's 1,052 (3 export rows unmatched by
   name). Of the 2 left: Pablo Peinado (Escobedo) has a 2052 listing date but the game shows him
-  only loan listed (unexplained false positive); David Villalba is in Almería's Under 19s.
+  only loan listed (unexplained false positive); David Villalba (Almería Under 19s) is not listed either: two false positives.
 - **Loan listed**: bit `0x02` of the flags byte 35 bytes into the terms block before that row.
   Not for a player out on loan: his first row is the parent club's contract, dated `01 ..`
   (`01 00 00 03`, `01 01 01 01`) instead of `FF`, and the game's loan-listed search leaves him

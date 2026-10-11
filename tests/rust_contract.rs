@@ -150,3 +150,14 @@ fn green_paid_rows_before_the_window() {
     assert_eq!(c.wage, Some(25_541));
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
 }
+
+// Simatos (Tottenham): youth contract, expires 2053-06-30; the block's start year is 1900 (unset).
+#[test]
+fn simatos_unset_start_year() {
+    check(
+        include_str!("fixtures/simatos.hex"),
+        637770,
+        220,
+        "2053-06-30",
+    );
+}

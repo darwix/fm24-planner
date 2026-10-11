@@ -241,3 +241,13 @@ fn transfer_and_loan_listed() {
     assert_eq!(listed(&fiorucci, 529531), (false, true));
     assert_eq!(listed(&sirera, 605300), (false, false));
 }
+
+// José Alberto (Melbourne City) is out on loan: his first row is the parent club's contract,
+// dated 01 00 00 03 rather than FF. The game's loan-listed search leaves players on loan out,
+// so his loan flag does not count.
+#[test]
+fn a_player_out_on_loan_is_not_loan_listed() {
+    use fm_savelens_backend::adapters::parser::records::contract::listed;
+    let jose_alberto = bytes(include_str!("fixtures/jose_alberto.hex"));
+    assert_eq!(listed(&jose_alberto, 478100), (false, false));
+}

@@ -132,3 +132,21 @@ fn transfer_and_loan_listed_filters_and_fields() {
     assert_eq!(found["players"][0]["transferListed"], json!(true));
     assert_eq!(found["players"][0]["loanListed"], json!(true));
 }
+
+// The loan-listed search, like the game's, leaves out the managed club's own players.
+#[test]
+fn loan_listed_filter_leaves_out_the_managed_club() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = snapshot(&dir);
+    rusqlite::Connection::open(&db.path)
+        .unwrap()
+        .execute_batch(
+            "UPDATE players SET loan_listed=0, club_id=NULL;
+         UPDATE players SET loan_listed=1, club_id=305 WHERE id IN (1,2);
+         UPDATE players SET loan_listed=1, club_id=7 WHERE id=3;
+         UPDATE metadata SET value=json_set(value,'$.managedClubId',305) WHERE key='snapshot';",
+        )
+        .unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("loanListed=1"), 1);
+}

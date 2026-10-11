@@ -196,3 +196,44 @@ fn own_club_row_with_zero_wage_and_type_3_is_a_non_contract() {
     assert!(!non_contract(&window(row(8033, 0, 1)), id, is_prat));
     assert!(!non_contract(&window(row(8033, 3335, 3)), id, is_prat));
 }
+
+// Non-contract at a B team (Rafael Salas, Cayón B, joined 2051): the zero-wage row with his own
+// club sits more than 800 bytes back and ends FF FF 04 00. A near own-club row with zero wage is
+// usually a real contract's side row, so only far ones count.
+#[test]
+fn far_zero_wage_own_club_row_is_a_non_contract() {
+    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    let id: u32 = 639666;
+    let row = |team: u32, tail: [u8; 4]| {
+        let mut r = id.to_le_bytes().to_vec();
+        r.extend(team.to_le_bytes());
+        r.extend([0; 4]);
+        r.extend(0u32.to_le_bytes());
+        r.extend([1, 0, 0]);
+        r.extend(tail);
+        r.extend([0, 0, 0xe4]);
+        r
+    };
+    let window = |gap: usize, tail: [u8; 4]| {
+        let mut w = vec![0u8; 100];
+        w.extend(row(30355, tail));
+        w.extend(vec![0u8; gap]);
+        w
+    };
+    let is_own = |team: u32| team == 30355;
+    assert!(non_contract(
+        &window(1000, [0xff, 0xff, 0x04, 0x00]),
+        id,
+        is_own
+    ));
+    assert!(!non_contract(
+        &window(300, [0xff, 0xff, 0x04, 0x00]),
+        id,
+        is_own
+    ));
+    assert!(!non_contract(
+        &window(1000, [0xff, 0xff, 0xff, 0x05]),
+        id,
+        is_own
+    ));
+}

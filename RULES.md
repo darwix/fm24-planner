@@ -57,8 +57,11 @@ Every contract has a 28-byte block before its row:
 - **Transfer listed**: the date just before the list's first contract row (`[day][year]`, year
   at row - 3) is the listing date; 1900 (`6C 07`) when not listed.
 - **Loan listed**: bit `0x02` of the flags byte 35 bytes into the terms block before that row.
-- A player without a contract (expired, non-contract, amateur, free agent) is never listed;
-  their first row is an old contract with stale flags.
+- A player without a contract (expired, non-contract, amateur, free agent) is treated as not
+  listed: 335 non-contract players carry a stale `0x02` from an old contract. Known miss: Bernd
+  Bochmann (Würzburger Kickers II) is non-contract and loan listed in the game, but neither of
+  his rows' flags bytes has `0x02` (both `0x40`); where a non-contract listing is stored is not
+  decoded.
 - Checked against in-game filtered exports (transfer listed 1,052, loan listed 2,321): every
   listed player is flagged (one loan miss). We flag 105 more as transfer listed (55 show `Lst`
   in the full export, so the filtered export left them out) and 75 more as loan listed (the

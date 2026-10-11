@@ -168,3 +168,31 @@ fn month_to_month_marker_after_four_ff_bytes() {
     assert!(find(&window([0x02, 0x00, 0x6c, 0x07]), id).month_to_month);
     assert!(!find(&window([0x01, 0x00, 0x6c, 0x07]), id).month_to_month);
 }
+
+// Non-contract (Carlos Contreras, Prat; Ibán Herrero): the row with the player's own club sits
+// far back and has zero wage and contract type 3 (byte 25 of the row); the nearer paid rows are
+// other clubs. A loan row at the borrowing club is type 1, and a full-time own row is paid.
+#[test]
+fn own_club_row_with_zero_wage_and_type_3_is_a_non_contract() {
+    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    let id: u32 = 424692;
+    let row = |team: u32, wage: u32, kind: u8| {
+        let mut r = id.to_le_bytes().to_vec();
+        r.extend(team.to_le_bytes());
+        r.extend([0; 4]);
+        r.extend(wage.to_le_bytes());
+        r.extend([1, 0, 0, 0x01, 0x00, 0x6c, 0x07, 0, 0, kind]);
+        r.extend([0u8; 50]);
+        r
+    };
+    let window = |own: Vec<u8>| {
+        let mut w = vec![0u8; 100];
+        w.extend(own);
+        w.extend(row(22627, 582, 6)); // another club's paid row
+        w
+    };
+    let is_prat = |team: u32| team == 8033;
+    assert!(non_contract(&window(row(8033, 0, 3)), id, is_prat));
+    assert!(!non_contract(&window(row(8033, 0, 1)), id, is_prat));
+    assert!(!non_contract(&window(row(8033, 3335, 3)), id, is_prat));
+}

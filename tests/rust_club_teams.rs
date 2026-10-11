@@ -138,3 +138,25 @@ fn a_list_whose_first_team_names_the_club_wins() {
     assert!(!lists.contains_key(&1465));
     assert_eq!((lists[&1464], lists[&32538]), (1263, 1263));
 }
+
+// Team number to club: a club's own list beats the club a team record names.
+#[test]
+fn team_clubs_prefers_the_club_lists() {
+    use fm_savelens_backend::adapters::parser::records::teams::team_clubs;
+    let teams = [
+        Team {
+            club: Some(4198),
+            ordinal: 29220,
+            kind: 100,
+            members: vec![],
+        },
+        Team {
+            club: Some(650),
+            ordinal: 828,
+            kind: 100,
+            members: vec![],
+        },
+    ];
+    let map = team_clubs(&teams, &[(29221, 27877)].into());
+    assert_eq!((map[&29221], map[&829]), (27877, 650));
+}

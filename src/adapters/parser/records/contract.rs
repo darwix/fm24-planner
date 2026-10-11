@@ -123,10 +123,15 @@ pub fn value(db: &[u8], ability_offset: usize) -> Option<u32> {
 
 /// `find` on the last 800 bytes of `wide`; only the month-to-month marker is looked for further
 /// back, since a wage row near the window's start (Lübcke) can have it just before the window.
+/// With no paid row there and no amateur deal, the whole of `wide` is read (Green: loan rows
+/// first, paid rows over 800 bytes back).
 pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
     let skip = wide.len().saturating_sub(WINDOW);
     let near = &wide[skip..];
     let found = find(near, person_id);
+    if found.wage.is_none() && !amateur(near, person_id) {
+        return find(wide, person_id);
+    }
     let rolling = found.month_to_month
         || wage_anchor(near, person_id).is_some_and(|at| month_to_month(wide, skip + at));
     Contract {
@@ -253,10 +258,14 @@ fn youth_start(window: &[u8], at: usize) -> bool {
         && window[at + YOUTH_ZEROS..at + DAY] == [0; 2]
 }
 
-/// `[start year][00 00][x]` followed by the FF run, here or one u32 later.
+/// `[start year][00 00][x]` followed by the FF run, here or one u32 later. Without the run (two
+/// set values instead, Duncliffe), a start date after the end must not be later than it.
 fn standard_start(window: &[u8], at: usize) -> bool {
+    let (day, year) = (u16(window, at + YEAR + 2), u16(window, at + YEAR + 4));
     (2020..=2100).contains(&u16(window, at - START_YEAR))
         && window[at - 2..at] == [0; 2]
         && (window[at + FF_RUN..at + FF_RUN + 4] == [0xff; 4]
-            || window[at + FF_RUN + 4..at + FF_RUN + 8] == [0xff; 4])
+            || window[at + FF_RUN + 4..at + FF_RUN + 8] == [0xff; 4]
+            || ((1..=366).contains(&day)
+                && (2000..=u16(window, at + YEAR)).contains(&year)))
 }

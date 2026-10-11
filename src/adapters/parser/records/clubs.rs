@@ -23,13 +23,16 @@ impl Head {
     const SIZE: usize = 43;
     /// Bytes the scan needs before it trusts a match.
     const MIN_ROOM: usize = 50;
-    /// None unless the separators match and the uid and nation repeat.
+    /// None unless the separators match and the uid and a nation repeat.
     fn read(db: &[u8], offset: usize) -> Option<Self> {
         if db[offset + 12] != 0 || db[offset + 17..offset + 21] != [255; 4] {
             return None;
         }
         let (uid, nation) = (u32(db, offset + 4), u32(db, offset + 13));
-        (u32(db, offset + 25) == nation && u32(db, offset + 8) == uid).then(|| Self {
+        // Toronto FC (Canada in the US league) has 120 first and 97 twice after
+        let home = u32(db, offset + 25);
+        let repeats = home == nation || (home <= 255 && u32(db, offset + 21) == home);
+        (repeats && u32(db, offset + 8) == uid).then(|| Self {
             id: u32(db, offset),
             uid,
             nation,

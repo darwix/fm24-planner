@@ -207,3 +207,13 @@ fn wage_comes_from_the_first_row() {
     let c = find_wide(&bytes(include_str!("fixtures/first_row_wage.hex")), 288628);
     assert_eq!(c.wage, Some(46_908));
 }
+
+// Sirera (Fuenlabrada C, full time to 2053-06-30): his first row (£273) sits 941 bytes back,
+// behind approaches; the end is in the terms block before that row. Fixture: 4000 bytes.
+#[test]
+fn end_comes_from_the_block_before_the_first_row() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/sirera.hex")), 605300);
+    assert_eq!(c.wage, Some(273));
+    assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
+}

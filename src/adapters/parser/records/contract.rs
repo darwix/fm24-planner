@@ -95,16 +95,19 @@ pub fn find(window: &[u8], person_id: u32) -> Contract {
 }
 
 /// How far before the wage row the terms block can sit.
-const TERMS_RANGE: usize = 200;
+const TERMS_RANGE: usize = 250;
 /// The year a month-to-month deal stores as its end.
 const NO_END_YEAR: u16 = 1900;
 
-/// Whether the terms block nearest before the wage row has no end year.
+/// Whether a terms block before the wage row has no end year but a real start. It need not be
+/// the nearest block: newer dated blocks can sit between it and the row.
 fn month_to_month(window: &[u8], anchor: usize) -> bool {
-    (anchor.saturating_sub(TERMS_RANGE)..anchor.saturating_sub(16))
-        .rev()
-        .find(|&at| window[at..at + 8] == [0xff; 8] && window[at + 8] != 0xff)
-        .is_some_and(|at| u16(window, at + 10) == NO_END_YEAR)
+    (anchor.saturating_sub(TERMS_RANGE)..anchor.saturating_sub(16)).any(|at| {
+        window[at..at + 8] == [0xff; 8]
+            && window[at + 8] != 0xff
+            && u16(window, at + 10) == NO_END_YEAR
+            && (2000..=2100).contains(&u16(window, at + 14))
+    })
 }
 
 // Wage anchor, from the person id.

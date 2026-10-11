@@ -181,7 +181,7 @@ fn own_club_row_with_zero_wage_and_type_3_is_a_non_contract() {
         r.extend(team.to_le_bytes());
         r.extend([0; 4]);
         r.extend(wage.to_le_bytes());
-        r.extend([1, 0, 0, 0x01, 0x00, 0x6c, 0x07, 0, 0, kind]);
+        r.extend([1, 0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0, kind]);
         r.extend([0u8; 50]);
         r
     };
@@ -236,4 +236,20 @@ fn far_zero_wage_own_club_row_is_a_non_contract() {
         id,
         is_own
     ));
+}
+
+// Miguel Ortega (Celje, on loan from Almería to 2053): his row with Celje is zero-wage type 3
+// too, but its tail is 03 2F 00 00, not FF like a non-contract's.
+#[test]
+fn type_3_own_club_row_without_ff_is_a_loan() {
+    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    let id: u32 = 600001;
+    let mut w = vec![0u8; 100];
+    w.extend(id.to_le_bytes());
+    w.extend(1237u32.to_le_bytes());
+    w.extend([0; 4]);
+    w.extend(0u32.to_le_bytes());
+    w.extend([1, 0, 0, 0x03, 0x2f, 0x00, 0x00, 0, 0, 3]);
+    w.extend([0u8; 60]);
+    assert!(!non_contract(&w, id, |team| team == 1237));
 }

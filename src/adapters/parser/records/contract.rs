@@ -79,6 +79,9 @@ pub fn value(db: &[u8], ability_offset: usize) -> Option<u32> {
 
 /// Wage, team and contract end from `window`, the bytes before the person record.
 pub fn find(window: &[u8], person_id: u32) -> Contract {
+    if amateur(window, person_id) {
+        return Contract::default();
+    }
     let Some(anchor) = wage_anchor(window, person_id) else {
         return Contract::default();
     };
@@ -114,16 +117,34 @@ const FLAG: usize = 16;
 const FLAG_PAD: usize = 18;
 const ANCHOR_LEN: usize = 19;
 
-/// The first `[person id][team][00 x4][wage][01 ?? 00]` with a wage above zero, so a loaned
-/// player reads the parent contract, not the zero-wage loan row.
-fn wage_anchor(window: &[u8], person_id: u32) -> Option<usize> {
+/// Every `[person id][team][00 x4][wage][01 ?? 00]` row in `window`, in order.
+fn rows(window: &[u8], person_id: u32) -> impl Iterator<Item = usize> + '_ {
     let needle = person_id.to_le_bytes();
-    (0..window.len().saturating_sub(ANCHOR_LEN)).find(|&at| {
+    (0..window.len().saturating_sub(ANCHOR_LEN)).filter(move |&at| {
         window[at..at + 4] == needle
             && window[at + ZEROS..at + WAGE] == [0; 4]
             && window[at + FLAG] == 1
             && window[at + FLAG_PAD] == 0
-            && u32(window, at + WAGE) > 0
+    })
+}
+
+/// The first row with a wage above zero, so a loaned player reads the parent contract, not the
+/// zero-wage loan row.
+fn wage_anchor(window: &[u8], person_id: u32) -> Option<usize> {
+    rows(window, person_id).find(|&at| u32(window, at + WAGE) > 0)
+}
+
+/// After the row's flags: 01 00 6C 07 (1900-01-01, unset) on a paid or loan row, FF on an
+/// amateur one.
+const ROW_DATE: usize = 19;
+const BLANK_DATE: [u8; 4] = [0x01, 0x00, 0x6c, 0x07];
+
+/// An amateur deal: the first row is zero-wage without the blank date. Any paid row after it is
+/// an old contract with another club.
+fn amateur(window: &[u8], person_id: u32) -> bool {
+    rows(window, person_id).next().is_some_and(|at| {
+        u32(window, at + WAGE) == 0
+            && window.get(at + ROW_DATE..at + ROW_DATE + 4) != Some(&BLANK_DATE[..])
     })
 }
 

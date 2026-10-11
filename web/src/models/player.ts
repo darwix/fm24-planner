@@ -1,4 +1,4 @@
-export type Tag = "exp" | "cheap";
+export type Tag = "exp" | "cheap" | "tl";
 
 export interface SquadPlayer {
   id?: number | string;
@@ -34,6 +34,8 @@ export interface PoolPlayer {
   left?: number;
   v?: number;
   w?: number;
+  tl?: boolean;
+  ll?: boolean;
 }
 
 export interface Candidate extends Omit<PoolPlayer, "nat"> {
@@ -49,6 +51,8 @@ export interface ScoutFilter {
   max: number;
   con: number;
   val: number | "";
+  // transfer or loan listed only
+  lst?: "tl" | "ll";
 }
 
 export interface ScoutList {
@@ -60,4 +64,5 @@ export interface ScoutList {
 export const TAG: Record<Tag, string> = {
   exp: "Contract expiring",
   cheap: "Cheap",
+  tl: "Transfer listed",
 };

@@ -22,6 +22,12 @@ const CONTRACTS: [number, string][] = [
   [6, "≤ 6 months"],
 ];
 
+const LISTED: [ScoutFilter["lst"], string][] = [
+  [undefined, "Any"],
+  ["tl", "Transfer"],
+  ["ll", "Loan"],
+];
+
 const Chip = ({
   on,
   onClick,
@@ -150,6 +156,19 @@ export default function Brief({
               onClick={() => patch({ val: v || "" })}
             >
               {v ? `£${v}M` : "Any"}
+            </Chip>
+          ))}
+        </div>
+      </Q>
+      <Q title="Listed" hint="by their club">
+        <div className="chips">
+          {LISTED.map(([v, label]) => (
+            <Chip
+              key={label}
+              on={f.lst === v}
+              onClick={() => patch({ lst: v })}
+            >
+              {label}
             </Chip>
           ))}
         </div>

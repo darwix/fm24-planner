@@ -38,4 +38,6 @@ export interface ApiPlayer {
   wage: number | null;
   contractEnd: string | null;
   value: number | null;
+  transferListed?: boolean;
+  loanListed?: boolean;
 }

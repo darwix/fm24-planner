@@ -20,12 +20,13 @@ export const need = (squad: Pick<SquadPlayer, "p" | "cover">[], pos: string) =>
 
 // ponytail: match = how close CA is to the player being replaced; attribute-profile matching comes later
 export const asCandidate = (
-  p: Pick<PoolPlayer, "ca" | "pa" | "left" | "v"> & Partial<PoolPlayer>,
+  p: Pick<PoolPlayer, "ca" | "pa" | "left" | "v" | "tl"> & Partial<PoolPlayer>,
   targetCa?: number,
 ): Candidate => {
   const tags: Tag[] = [
     ...(p.left !== undefined && p.left <= 12 ? (["exp"] as Tag[]) : []),
     ...(p.v !== undefined && p.v <= 5 ? (["cheap"] as Tag[]) : []),
+    ...(p.tl ? (["tl"] as Tag[]) : []),
   ];
   return {
     ...(p as PoolPlayer),

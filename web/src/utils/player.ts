@@ -31,6 +31,8 @@ export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
   ...(f.con > 0 && { contractEndMax: expiryCutoff(gameDate, f.con) }),
   ...(f.val && { valueMax: f.val * 1_000_000 }),
   ...(f.val && f.con === -1 && { valueUnknown: 1 }),
+  ...(f.lst === "tl" && { transferListed: 1 }),
+  ...(f.lst === "ll" && { loanListed: 1 }),
   sort: "pa",
   limit: 250,
 });
@@ -66,6 +68,8 @@ export const toPool = (p: ApiPlayer, gameDate: string): PoolPlayer => ({
   left: !p.club && !p.contractEnd ? 0 : monthsLeft(p.contractEnd, gameDate),
   v: p.value ? Math.round(p.value / 1e5) / 10 : undefined,
   w: p.wage ? Math.round(p.wage / 1000) : undefined,
+  tl: p.transferListed,
+  ll: p.loanListed,
 });
 
 export const SWIPE_PAGE = 50;

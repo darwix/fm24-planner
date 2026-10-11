@@ -23,7 +23,7 @@ export default function Shortlist() {
   const [squad, setSquad] = useRecoilState(squadState);
   const [vacant, setVacant] = useRecoilState(vacantState);
   const sel = useRecoilValue(selectedState);
-  const [on, setOn] = useState<Tag[]>(["exp", "cheap"]);
+  const [on, setOn] = useState<Tag[]>(["exp", "cheap", "tl"]);
   const t = squad[sel] ?? squad[0];
   const pos = addPos ?? t?.p;
   // target CA: the player being replaced, or the squad average when adding cover

@@ -188,3 +188,13 @@ fn terms_block_with_a_later_year_field() {
     assert_eq!(c.wage, Some(5_797));
     assert_eq!(c.contract_end.as_deref(), Some("2053-12-31"));
 }
+
+// Player 584177: his FF-dated contract row (£22,030, to 2053-06-30) sits 1190 bytes back; the
+// four blank-dated paid rows after it are other clubs' approaches, not his contract.
+#[test]
+fn blank_dated_approach_rows_are_skipped() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/approaches.hex")), 584177);
+    assert_eq!(c.wage, Some(22_030));
+    assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
+}

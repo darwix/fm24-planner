@@ -110,3 +110,25 @@ fn no_contract_keeps_only_players_without_a_contract_end_or_wage() {
     assert_eq!(total("noContract=1"), 62);
     assert_eq!(total(""), 64);
 }
+
+#[test]
+fn transfer_and_loan_listed_filters_and_fields() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = snapshot(&dir);
+    rusqlite::Connection::open(&db.path)
+        .unwrap()
+        .execute_batch(
+            "UPDATE players SET transfer_listed=0, loan_listed=0;
+         UPDATE players SET transfer_listed=1 WHERE id IN (1,2);
+         UPDATE players SET loan_listed=1 WHERE id IN (2,3,4);",
+        )
+        .unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("transferListed=1"), 2);
+    assert_eq!(total("loanListed=1"), 3);
+    assert_eq!(total("transferListed=1&loanListed=1"), 1);
+    assert_eq!(total(""), 64);
+    let found = db.search("transferListed=1&loanListed=1").unwrap();
+    assert_eq!(found["players"][0]["transferListed"], json!(true));
+    assert_eq!(found["players"][0]["loanListed"], json!(true));
+}

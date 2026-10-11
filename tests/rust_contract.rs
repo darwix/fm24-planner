@@ -226,3 +226,18 @@ fn start_day_after_the_end_is_masked() {
     let c = find_wide(&bytes(include_str!("fixtures/breant.hex")), 603910);
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
 }
+
+// Transfer listed: the date just before the first contract row (day, year) is set when the
+// player is listed (Breant, Sassuolo: 2052) and 1900 otherwise. Loan listed: bit 0x02 of the
+// flags byte 35 bytes into that row's terms block. Breant is both, Fiorucci (AS Roma) only loan
+// listed, Sirera neither.
+#[test]
+fn transfer_and_loan_listed() {
+    use fm_savelens_backend::adapters::parser::records::contract::listed;
+    let breant = bytes(include_str!("fixtures/breant.hex"));
+    let fiorucci = bytes(include_str!("fixtures/fiorucci.hex"));
+    let sirera = bytes(include_str!("fixtures/sirera.hex"));
+    assert_eq!(listed(&breant, 603910), (true, true));
+    assert_eq!(listed(&fiorucci, 529531), (false, true));
+    assert_eq!(listed(&sirera, 605300), (false, false));
+}

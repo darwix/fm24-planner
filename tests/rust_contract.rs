@@ -129,3 +129,24 @@ fn youth_contract_has_no_start_year_before_the_expiry() {
         "2053-06-30",
     );
 }
+
+// Duncliffe (Arsenal): full time, £5,110 p/w, expires 2053-06-30; was read as expired.
+#[test]
+fn duncliffe_wage_and_expiry() {
+    check(
+        include_str!("fixtures/duncliffe.hex"),
+        550333,
+        5_108,
+        "2053-06-30",
+    );
+}
+
+// Green: on loan at West Brom (£2,550) from Liverpool (£25,540, expires 2053-06-30). Both paid
+// rows sit before the last 800 bytes, behind three zero-wage rows. Fixture is 3000 bytes.
+#[test]
+fn green_paid_rows_before_the_window() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/green.hex")), 515186);
+    assert_eq!(c.wage, Some(25_541));
+    assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
+}

@@ -70,6 +70,7 @@ fn zero_wage_first_row_means_no_paid_contract() {
         r.extend([0; 4]);
         r.extend(wage.to_le_bytes());
         r.extend([1, 0, 0]);
+        r.extend([0xff, 0x03, 0, 0]);
         r.extend([0u8; 60]);
         r
     };
@@ -78,4 +79,26 @@ fn zero_wage_first_row_means_no_paid_contract() {
     w.extend(row(8070, 268));
     let c = find(&w, id);
     assert_eq!((c.wage, c.contract_end), (None, None));
+}
+
+// Mitch Brannigan (Watford, on loan): his first row is also zero-wage, but it carries a blank
+// date (01 00 6C 07 = 1900-01-01) where an amateur row has FF; his paid contract still counts.
+#[test]
+fn zero_wage_row_with_a_blank_date_keeps_the_paid_contract() {
+    use fm_savelens_backend::adapters::parser::records::contract::find;
+    let id: u32 = 700001;
+    let row = |team: u32, wage: u32, tail: [u8; 4]| {
+        let mut r = id.to_le_bytes().to_vec();
+        r.extend(team.to_le_bytes());
+        r.extend([0; 4]);
+        r.extend(wage.to_le_bytes());
+        r.extend([1, 0, 0]);
+        r.extend(tail);
+        r.extend([0u8; 60]);
+        r
+    };
+    let mut w = vec![0u8; 100];
+    w.extend(row(500, 0, [0x01, 0x00, 0x6c, 0x07]));
+    w.extend(row(431, 2923, [0x01, 0x00, 0x6c, 0x07]));
+    assert_eq!(find(&w, id).wage, Some(2923));
 }

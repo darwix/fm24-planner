@@ -95,7 +95,7 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         args.push(date.clone().into());
     }
     if filter.transfer_listed {
-        clauses.push("transfer_listed = 1".into());
+        clauses.push("transfer_listed = 1 AND coalesce(club_id, -1) != coalesce((SELECT json_extract(value, '$.managedClubId') FROM metadata WHERE key = 'snapshot'), -2)".into());
     }
     if filter.loan_listed {
         // like the game's search, leave out the managed club's own players

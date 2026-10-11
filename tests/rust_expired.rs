@@ -55,3 +55,27 @@ fn month_to_month_contract_counts_as_expired() {
     let c = c.expire_stale(829, "2053-03-08");
     assert_eq!((c.wage, c.contract_end), (None, None));
 }
+
+// An amateur deal (Airam, Los Llanos): the first contract row is the current club's at zero
+// wage, and an old paid contract with another club follows. The game lists him as out of
+// contract, so the old wage must not count. A loanee's first row is the paid parent contract
+// (see rust_contract.rs, Ruiz), so this does not affect loans.
+#[test]
+fn zero_wage_first_row_means_no_paid_contract() {
+    use fm_savelens_backend::adapters::parser::records::contract::find;
+    let id: u32 = 605612;
+    let row = |team: u32, wage: u32| {
+        let mut r = id.to_le_bytes().to_vec();
+        r.extend(team.to_le_bytes());
+        r.extend([0; 4]);
+        r.extend(wage.to_le_bytes());
+        r.extend([1, 0, 0]);
+        r.extend([0u8; 60]);
+        r
+    };
+    let mut w = vec![0u8; 100];
+    w.extend(row(22540, 0));
+    w.extend(row(8070, 268));
+    let c = find(&w, id);
+    assert_eq!((c.wage, c.contract_end), (None, None));
+}

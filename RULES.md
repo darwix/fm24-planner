@@ -64,7 +64,8 @@ Every contract has a 28-byte block before its row:
   decoded.
 - Checked against in-game filtered exports (transfer listed 1,052, loan listed 2,321): every
   listed player is flagged (one loan miss). We flag 105 more as transfer listed (55 show `Lst`
-  in the full export, so the filtered export left them out) and 75 more as loan listed (the
+  in the full export; the rest are mostly out on loan, which the game's listed searches leave
+  out: Antonio Guimaraes, Mohamed Cherkaoui and Aritz Ruiz confirmed listed) and 75 more as loan listed (the
   game's loan-listed search leaves out players already out on loan: José Alberto, Melbourne
   City, is loan listed and on loan).
 

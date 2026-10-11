@@ -19,6 +19,8 @@ pub struct PlayerSummary {
     pub wage: Option<u32>,
     pub contract_end: Option<String>,
     pub value: Option<u32>,
+    pub transfer_listed: bool,
+    pub loan_listed: bool,
 }
 
 /// One page of search results.

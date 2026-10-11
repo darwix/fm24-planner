@@ -100,6 +100,8 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
         filter.contract_end_max = Some(date.clone());
     }
     filter.no_contract = flag("noContract");
+    filter.transfer_listed = flag("transferListed");
+    filter.loan_listed = flag("loanListed");
     filter.club = integer("club", -1, MAX_CLUB)?.map(|n| match n {
         -1 => ClubFilter::Free,
         id => ClubFilter::Id(id as u32),

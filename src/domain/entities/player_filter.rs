@@ -41,6 +41,8 @@ pub struct PlayerFilter {
     /// ISO date; players with no contract never match.
     pub contract_end_max: Option<String>,
     pub no_contract: bool,
+    pub transfer_listed: bool,
+    pub loan_listed: bool,
     pub club: Option<ClubFilter>,
     pub nation: Option<i64>,
     pub positions: Option<PositionFilter>,
@@ -64,6 +66,8 @@ impl Default for PlayerFilter {
             exclude_ids: vec![],
             contract_end_max: None,
             no_contract: false,
+            transfer_listed: false,
+            loan_listed: false,
             club: None,
             nation: None,
             positions: None,

@@ -94,6 +94,12 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         clauses.push("contract_end <= ?".into());
         args.push(date.clone().into());
     }
+    if filter.transfer_listed {
+        clauses.push("transfer_listed = 1".into());
+    }
+    if filter.loan_listed {
+        clauses.push("loan_listed = 1".into());
+    }
     if filter.no_contract {
         // a wage without a decoded end date is still a contract
         clauses.push("contract_end IS NULL AND wage IS NULL".into());
@@ -146,7 +152,7 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         filter.limit.into(),
         ((filter.page - 1) * filter.limit).into(),
     ]);
-    let mut stmt = db.prepare(&format!("SELECT id,uid,name,age,club_id,club,nationalities,positions,ca,pa,wage,contract_end,value FROM players {condition} ORDER BY {column} {direction}, ca DESC, id ASC LIMIT ? OFFSET ?"))?;
+    let mut stmt = db.prepare(&format!("SELECT id,uid,name,age,club_id,club,nationalities,positions,ca,pa,wage,contract_end,value,transfer_listed,loan_listed FROM players {condition} ORDER BY {column} {direction}, ca DESC, id ASC LIMIT ? OFFSET ?"))?;
     let players = stmt
         .query_map(params_from_iter(&args), |r| {
             let nationalities: String = r.get(6)?;
@@ -165,6 +171,8 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
                 wage: r.get(10)?,
                 contract_end: r.get(11)?,
                 value: r.get(12)?,
+                transfer_listed: r.get(13)?,
+                loan_listed: r.get(14)?,
             })
         })?
         .collect::<std::result::Result<Vec<_>, _>>()?;

@@ -13,7 +13,7 @@ use std::{
 
 /// Columns before the per-attribute ones, in insert order, with their SQL types.
 /// The attribute columns and `detail` follow; see [`player_columns`].
-const PLAYER_COLUMNS: [(&str, &str); 19] = [
+const PLAYER_COLUMNS: [(&str, &str); 21] = [
     ("id", "INTEGER PRIMARY KEY"),
     ("uid", "INTEGER NOT NULL"),
     ("name", "TEXT NOT NULL"),
@@ -33,6 +33,8 @@ const PLAYER_COLUMNS: [(&str, &str); 19] = [
     ("wage", "INTEGER"),
     ("contract_end", "TEXT"),
     ("value", "INTEGER"),
+    ("transfer_listed", "INTEGER NOT NULL"),
+    ("loan_listed", "INTEGER NOT NULL"),
 ];
 
 /// Every column of the players table as `name TYPE`, in insert order.
@@ -90,6 +92,8 @@ fn create_snapshot(path: &Path, snapshot: &NewSnapshot, cancel: &CancelFlag) -> 
                 optional(p.wage),
                 optional(p.contract_end.clone()),
                 optional(p.value),
+                p.transfer_listed.into(),
+                p.loan_listed.into(),
             ];
             values.extend(
                 CATALOG

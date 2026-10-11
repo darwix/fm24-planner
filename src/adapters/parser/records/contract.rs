@@ -31,19 +31,21 @@ pub struct Contract {
     pub value: Option<u32>,
     /// A rolling deal with no end date, which the game lists as out of contract.
     pub month_to_month: bool,
+    pub transfer_listed: bool,
+    pub loan_listed: bool,
 }
 
 impl Contract {
     /// Drops the wage and end date of a contract the game no longer honours: a free agent's
     /// leftover one (team u32::MAX), one that ended before the game date (ISO dates), or a
-    /// month-to-month deal.
+    /// month-to-month deal. Without a contract the listing flags are stale too.
     pub fn expire_stale(self, team: u32, game_date: &str) -> Contract {
         let ended = self
             .contract_end
             .as_deref()
             .is_some_and(|end| end < game_date);
         let rolling = self.month_to_month && self.contract_end.is_none();
-        if team == u32::MAX || ended || rolling {
+        let current = if team == u32::MAX || ended || rolling {
             Contract {
                 wage: None,
                 contract_end: None,
@@ -51,6 +53,12 @@ impl Contract {
             }
         } else {
             self
+        };
+        let signed = current.wage.is_some();
+        Contract {
+            transfer_listed: current.transfer_listed && signed,
+            loan_listed: current.loan_listed && signed,
+            ..current
         }
     }
 }
@@ -82,8 +90,11 @@ pub fn for_people(
         } else {
             find_wide(wide, id)
         };
+        let (transfer_listed, loan_listed) = listed(wide, id);
         contracts.push(Contract {
             value: value(db, ability.offset),
+            transfer_listed,
+            loan_listed,
             ..found
         });
     }
@@ -199,8 +210,8 @@ fn contract_at(window: &[u8], anchor: usize) -> Contract {
         team: Some(u32(window, anchor + TEAM)),
         contract_end: contract_end(window, anchor)
             .or_else(|| (!month_to_month(window, anchor)).then(|| terms_end(window, anchor))?),
-        value: None,
         month_to_month: month_to_month(window, anchor),
+        ..Contract::default()
     }
 }
 
@@ -302,17 +313,47 @@ const TERMS_END: usize = 24;
 
 /// The end in the nearest terms block before `anchor`.
 fn terms_end(window: &[u8], anchor: usize) -> Option<String> {
-    (0..anchor.saturating_sub(TERMS_LEN)).rev().find_map(|at| {
-        let field = u16(window, at + 8);
-        let (day, year) = (u16(window, at + TERMS_END) & 511, u16(window, at + TERMS_END + 2));
-        let block = window[at..at + 4] == [4, 0, 0, 0]
-            && (field == 1900 || (2000..=2100).contains(&field))
-            && window[at + 10..at + 12] == [0; 2]
-            && (1..=366).contains(&day)
-            && (2020..=2100).contains(&year)
-            && year != 2047;
-        block.then(|| date_of(year, day).ok()).flatten()
-    })
+    terms_block(window, anchor).and_then(|at| block_end(window, at))
+}
+
+/// Where the nearest terms block before `anchor` starts.
+fn terms_block(window: &[u8], anchor: usize) -> Option<usize> {
+    (0..anchor.saturating_sub(TERMS_LEN))
+        .rev()
+        .find(|&at| block_end(window, at).is_some())
+}
+
+/// The end of a terms block starting at `at`, if one does.
+fn block_end(window: &[u8], at: usize) -> Option<String> {
+    let field = u16(window, at + 8);
+    let (day, year) = (u16(window, at + TERMS_END) & 511, u16(window, at + TERMS_END + 2));
+    let block = window[at..at + 4] == [4, 0, 0, 0]
+        && (field == 1900 || (2000..=2100).contains(&field))
+        && window[at + 10..at + 12] == [0; 2]
+        && (1..=366).contains(&day)
+        && (2020..=2100).contains(&year)
+        && year != 2047;
+    block.then(|| date_of(year, day).ok()).flatten()
+}
+
+/// The year of the date just before the first contract row: set when the player is transfer
+/// listed (the listing date), 1900 otherwise.
+const LISTED_YEAR: usize = 3;
+/// Flags byte after the first row's terms block; bit 0x02 is set when loan listed.
+const LISTING_FLAGS: usize = 35;
+const LOAN_LISTED: u8 = 0x02;
+
+/// (transfer listed, loan listed), from the list's first contract row in `wide`.
+pub fn listed(wide: &[u8], person_id: u32) -> (bool, bool) {
+    let Some(first) = rows(wide, person_id).next() else {
+        return (false, false);
+    };
+    let transfer = first >= LISTED_YEAR
+        && (2000..=2100).contains(&u16(wide, first - LISTED_YEAR));
+    let loan = terms_block(wide, first)
+        .and_then(|at| wide.get(at + LISTING_FLAGS))
+        .is_some_and(|flags| flags & LOAN_LISTED != 0);
+    (transfer, loan)
 }
 
 /// The expiry date if an expiry block has its `x` at `at`.

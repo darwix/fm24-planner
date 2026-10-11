@@ -52,6 +52,17 @@ Every contract has a 28-byte block before its row:
 | Full time at £0 (Sarı) | first row zero wage, block `[1900][00 00][0][FF x4]` with an end | wage 0, that end |
 | Non-contract | last own-club row zero wage, date `FF`, and type byte 3, or (more than 800 bytes back, tail `FF FF ?? 00` or `FF x4`, and no paid row before it) | expired |
 
+## Transfer and loan listed
+
+- **Transfer listed**: the date just before the list's first contract row (`[day][year]`, year
+  at row - 3) is the listing date; 1900 (`6C 07`) when not listed.
+- **Loan listed**: bit `0x02` of the flags byte 35 bytes into the terms block before that row.
+- A player without a contract (expired, non-contract, amateur, free agent) is never listed;
+  their first row is an old contract with stale flags.
+- Checked against in-game filtered exports (transfer listed 1,052, loan listed 2,321): every
+  listed player is flagged (one loan miss). We flag 105 more as transfer listed (55 show `Lst`
+  in the full export, so the filtered export left them out) and 75 more as loan listed.
+
 ## Clubs
 
 - Club record: `[id][uid][uid][00][nation][FF x4][nation2][nation2] .. [name len][name][short len][short]`.
@@ -76,7 +87,7 @@ Name, Club, Contract Type (F/PT), Salary, Expires. The test save's export has 54
    £15 or 6%). With a previous snapshot it lists every player whose wage or end changed; each
    must be a fix.
 
-Baseline at `fm24-rust-47-fm` (54,308 matched): expired 100%; end 38,031 of 38,031; wage 38,019
+Baseline at `fm24-rust-49-fm` (54,308 matched): expired 100%; end 38,031 of 38,031; wage 38,019
 right, 87 month-to-month with no wage (by design), 0 wrong.
 
 ## Notes

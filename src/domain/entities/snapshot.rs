@@ -87,6 +87,8 @@ pub struct PlayerRecord {
     pub wage: Option<u32>,
     pub contract_end: Option<String>,
     pub value: Option<u32>,
+    pub transfer_listed: bool,
+    pub loan_listed: bool,
     pub attributes: BTreeMap<String, u8>,
     pub detail: PlayerDetail,
 }
@@ -171,6 +173,8 @@ impl NewSnapshot {
                     contract_end: player.contract_end.clone(),
                     // a value of 0 means the save has none, so keep it unknown
                     value: player.value.filter(|v| *v > 0),
+                    transfer_listed: player.transfer_listed,
+                    loan_listed: player.loan_listed,
                     attributes: player.attributes.clone(),
                     detail: PlayerDetail {
                         player,

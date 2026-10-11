@@ -79,6 +79,8 @@ fn build(
         wage: contract.wage,
         contract_end: contract.contract_end,
         value: contract.value,
+        transfer_listed: contract.transfer_listed,
+        loan_listed: contract.loan_listed,
         source: json!({
             "person": person.offset,
             "ability": ability.offset,

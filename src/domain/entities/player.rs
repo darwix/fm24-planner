@@ -25,6 +25,10 @@ pub struct Player {
     pub wage: Option<u32>,
     pub contract_end: Option<String>,
     pub value: Option<u32>,
+    #[serde(default)]
+    pub transfer_listed: bool,
+    #[serde(default)]
+    pub loan_listed: bool,
     pub source: Value,
 }
 

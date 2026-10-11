@@ -7,8 +7,8 @@
 //! expiry  [start year u16][00 00][x u32][FF x4] .. [day u16][year u16]   day at x + 12
 //!         youth contracts have no start year: [FF x4][u32][00 00][day u16][year u16]
 //! wage    [person id u32][team u32][00 x4][weekly wage u32][01][..][00]
-//! terms   [FF x8][end day u16][end year u16][start day u16][start year u16]  before the wage row;
-//!         end year 1900 means no end: a month-to-month deal
+//! terms   [FF x4+][end day u16][end year u16][start day u16][start year u16]  before the wage row;
+//!         end 1900 day 2 means no end: a month-to-month deal (1900 day 1 is the blank date)
 //! ```
 //! The market value is not in the contract block: it is the u32 right after the person's
 //! attribute block.
@@ -96,17 +96,17 @@ pub fn find(window: &[u8], person_id: u32) -> Contract {
 
 /// How far before the wage row the terms block can sit.
 const TERMS_RANGE: usize = 450;
-/// The year a month-to-month deal stores as its end.
-const NO_END_YEAR: u16 = 1900;
+/// The end a month-to-month deal stores: 1900, day 2.
+const NO_END: [u8; 4] = [0x02, 0x00, 0x6c, 0x07];
 
-/// Whether a terms block before the wage row has no end year but a real start. It need not be
-/// the nearest block: newer dated blocks can sit between it and the row.
+/// Whether a terms block before the wage row has no end but a real start. It need not be the
+/// nearest block (newer dated blocks can sit between it and the row), and as few as four FF
+/// bytes can lead it.
 fn month_to_month(window: &[u8], anchor: usize) -> bool {
-    (anchor.saturating_sub(TERMS_RANGE)..anchor.saturating_sub(16)).any(|at| {
-        window[at..at + 8] == [0xff; 8]
-            && window[at + 8] != 0xff
-            && u16(window, at + 10) == NO_END_YEAR
-            && (2000..=2100).contains(&u16(window, at + 14))
+    (anchor.saturating_sub(TERMS_RANGE)..anchor.saturating_sub(12)).any(|at| {
+        window[at..at + 4] == [0xff; 4]
+            && window[at + 4..at + 8] == NO_END
+            && (2000..=2100).contains(&u16(window, at + 10))
     })
 }
 

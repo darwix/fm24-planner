@@ -59,7 +59,7 @@ impl Contract {
 const WINDOW: usize = 800;
 
 /// How far before a person record the row with their own club can sit.
-const OWN_WINDOW: usize = 3000;
+const OWN_WINDOW: usize = 4000;
 
 /// The contract and value of each linked person, in order. `team_club` maps a team number to
 /// its club, to find the row with the player's own club.
@@ -160,9 +160,13 @@ pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
         .map(|at| u32(wide, at + WAGE))
         .filter(|&w| w > 0 && found.wage.is_some_and(|f| f > 0))
         .or(found.wage);
-    let contract_end = found
-        .contract_end
-        .clone()
+    // the terms block before the list's first row holds the end the game shows; when that row is
+    // the anchor the older rules already read its block
+    let first = rows(wide, person_id).next();
+    let contract_end = first
+        .filter(|&at| paid && Some(at) != anchor && u32(wide, at + WAGE) > 0)
+        .and_then(|at| terms_end(wide, at))
+        .or_else(|| found.contract_end.clone())
         .or_else(|| anchor.filter(|_| paid).and_then(|at| terms_end(wide, at)));
     Contract {
         wage,

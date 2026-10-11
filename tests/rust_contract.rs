@@ -168,3 +168,23 @@ fn simatos_unset_start_year() {
 fn sari_zero_wage_contract_with_an_end() {
     check(include_str!("fixtures/sari.hex"), 657818, 0, "2054-12-31");
 }
+
+// Terms blocks all read [04 00 00 00][u32][year][00 00][x][v1][v2][end day][end year][start].
+// Miki (Newcastle, to 2057-06-30): his block sits before the last 800 bytes. Fixture: 3000 bytes.
+#[test]
+fn terms_block_before_the_window() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/terms_far.hex")), 584929);
+    assert_eq!(c.wage, Some(32_819));
+    assert_eq!(c.contract_end.as_deref(), Some("2057-06-30"));
+}
+
+// Andrés Álvarez (Inter de Palmira, to 2053-12-31): the year field before x (2054) is later
+// than the end, so it is not a start year.
+#[test]
+fn terms_block_with_a_later_year_field() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/terms_late_year.hex")), 246717);
+    assert_eq!(c.wage, Some(5_797));
+    assert_eq!(c.contract_end.as_deref(), Some("2053-12-31"));
+}

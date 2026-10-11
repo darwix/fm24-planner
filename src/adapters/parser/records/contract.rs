@@ -95,7 +95,7 @@ pub fn find(window: &[u8], person_id: u32) -> Contract {
 }
 
 /// How far before the wage row the terms block can sit.
-const TERMS_RANGE: usize = 250;
+const TERMS_RANGE: usize = 450;
 /// The year a month-to-month deal stores as its end.
 const NO_END_YEAR: u16 = 1900;
 

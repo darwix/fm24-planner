@@ -238,6 +238,30 @@ fn far_zero_wage_own_club_row_is_a_non_contract() {
     ));
 }
 
+// José María Sirera (Fuenlabrada C, full time to 2053): his far own-club row looks like Salas's,
+// but the row before it has a wage (£273), so he holds a paid contract.
+#[test]
+fn far_own_club_row_after_a_paid_row_is_not_a_non_contract() {
+    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    let id: u32 = 605300;
+    let row = |team: u32, wage: u32, tail: [u8; 4]| {
+        let mut r = id.to_le_bytes().to_vec();
+        r.extend(team.to_le_bytes());
+        r.extend([0; 4]);
+        r.extend(wage.to_le_bytes());
+        r.extend([1, 0, 0]);
+        r.extend(tail);
+        r.extend([0, 0, 0x51]);
+        r
+    };
+    let mut w = vec![0u8; 100];
+    w.extend(row(33748, 273, [0xff, 0x03, 0x00, 0x00]));
+    w.extend(vec![0u8; 50]);
+    w.extend(row(28143, 0, [0xff, 0xff, 0x03, 0x00]));
+    w.extend(vec![0u8; 1000]);
+    assert!(!non_contract(&w, id, |team| team == 28143));
+}
+
 // Miguel Ortega (Celje, on loan from Almería to 2053): his row with Celje is zero-wage type 3
 // too, but its tail is 03 2F 00 00, not FF like a non-contract's.
 #[test]

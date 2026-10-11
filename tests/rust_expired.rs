@@ -8,7 +8,7 @@ fn contract(end: &str) -> Contract {
         team: Some(732),
         contract_end: Some(end.into()),
         value: Some(1000),
-        month_to_month: false,
+        ..Contract::default()
     }
 }
 
@@ -297,4 +297,24 @@ fn month_to_month_marker_before_the_window_still_counts() {
     let c = find_wide(&w, id);
     assert_eq!(c.wage, Some(140));
     assert!(c.month_to_month);
+}
+
+// A player without a contract can't be listed: a non-contract or free agent's first row is an
+// old contract, whose listing flags are stale (337 non-contract and amateur players looked loan
+// listed in the test save).
+#[test]
+fn no_contract_means_not_listed() {
+    let stale = Contract {
+        transfer_listed: true,
+        loan_listed: true,
+        ..Contract::default()
+    }
+    .expire_stale(732, "2053-01-01");
+    assert!(!stale.transfer_listed && !stale.loan_listed);
+    let kept = Contract {
+        loan_listed: true,
+        ..contract("2055-06-30")
+    }
+    .expire_stale(732, "2053-01-01");
+    assert!(kept.loan_listed);
 }

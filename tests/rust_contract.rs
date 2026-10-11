@@ -198,3 +198,12 @@ fn blank_dated_approach_rows_are_skipped() {
     assert_eq!(c.wage, Some(22_030));
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
 }
+
+// Elton Morais (Luton, £47,000 in the game): the first row of his list (£46,908) is the contract
+// the game shows; the FF-dated row after it (£42,217) and the approaches are not.
+#[test]
+fn wage_comes_from_the_first_row() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/first_row_wage.hex")), 288628);
+    assert_eq!(c.wage, Some(46_908));
+}

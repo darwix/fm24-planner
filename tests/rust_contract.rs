@@ -217,3 +217,12 @@ fn end_comes_from_the_block_before_the_first_row() {
     assert_eq!(c.wage, Some(273));
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
 }
+
+// Breant (Sassuolo, to 2053-06-30): his block has set values and a start day stored with high
+// bits (EF 32), which must be masked like any day.
+#[test]
+fn start_day_after_the_end_is_masked() {
+    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    let c = find_wide(&bytes(include_str!("fixtures/breant.hex")), 603910);
+    assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
+}

@@ -7,6 +7,8 @@
 //! expiry  [start year u16][00 00][x u32][FF x4] .. [day u16][year u16]   day at x + 12
 //!         youth contracts have no start year: [FF x4][u32][00 00][day u16][year u16]
 //! wage    [person id u32][team u32][00 x4][weekly wage u32][01][..][00]
+//! terms   [FF x8][end day u16][end year u16][start day u16][start year u16]  before the wage row;
+//!         end year 1900 means no end: a month-to-month deal
 //! ```
 //! The market value is not in the contract block: it is the u32 right after the person's
 //! attribute block.
@@ -26,15 +28,26 @@ pub struct Contract {
     pub contract_end: Option<String>,
     /// Market value in the save's base currency.
     pub value: Option<u32>,
+    /// A rolling deal with no end date, which the game lists as out of contract.
+    pub month_to_month: bool,
 }
 
 impl Contract {
     /// Drops the wage and end date of a contract the game no longer honours: a free agent's
-    /// leftover one (team u32::MAX) or one that ended before the game date (ISO dates).
+    /// leftover one (team u32::MAX), one that ended before the game date (ISO dates), or a
+    /// month-to-month deal.
     pub fn expire_stale(self, team: u32, game_date: &str) -> Contract {
-        let ended = self.contract_end.as_deref().is_some_and(|end| end < game_date);
-        if team == u32::MAX || ended {
-            Contract { wage: None, contract_end: None, ..self }
+        let ended = self
+            .contract_end
+            .as_deref()
+            .is_some_and(|end| end < game_date);
+        let rolling = self.month_to_month && self.contract_end.is_none();
+        if team == u32::MAX || ended || rolling {
+            Contract {
+                wage: None,
+                contract_end: None,
+                ..self
+            }
         } else {
             self
         }
@@ -74,7 +87,21 @@ pub fn find(window: &[u8], person_id: u32) -> Contract {
         team: Some(u32(window, anchor + TEAM)),
         contract_end: contract_end(window, anchor),
         value: None,
+        month_to_month: month_to_month(window, anchor),
     }
+}
+
+/// How far before the wage row the terms block can sit.
+const TERMS_RANGE: usize = 200;
+/// The year a month-to-month deal stores as its end.
+const NO_END_YEAR: u16 = 1900;
+
+/// Whether the terms block nearest before the wage row has no end year.
+fn month_to_month(window: &[u8], anchor: usize) -> bool {
+    (anchor.saturating_sub(TERMS_RANGE)..anchor.saturating_sub(16))
+        .rev()
+        .find(|&at| window[at..at + 8] == [0xff; 8] && window[at + 8] != 0xff)
+        .is_some_and(|at| u16(window, at + 10) == NO_END_YEAR)
 }
 
 // Wage anchor, from the person id.

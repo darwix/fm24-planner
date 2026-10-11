@@ -116,3 +116,32 @@ describe("nameQuery", () => {
     expect(nameQuery("   ")).toBeNull();
   });
 });
+
+describe("listed filters", () => {
+  const f = { pos: [] as string[], min: 18, max: 23, con: 0, val: "" as const };
+  it("sends transferListed or loanListed for the listed chip", () => {
+    expect(scoutQuery({ ...f, lst: "tl" }, "2053-03-01").transferListed).toBe(
+      1,
+    );
+    expect(scoutQuery({ ...f, lst: "ll" }, "2053-03-01").loanListed).toBe(1);
+    expect(scoutQuery(f, "2053-03-01")).not.toHaveProperty("transferListed");
+  });
+  it("maps the API's listed flags", () => {
+    const api = {
+      id: 1,
+      name: "A",
+      age: 20,
+      ca: 100,
+      pa: 120,
+      club: "X",
+      nationalities: ["ESP"],
+      positions: ["ST"],
+      wage: 100,
+      contractEnd: "2054-06-30",
+      value: 1e6,
+      transferListed: true,
+      loanListed: false,
+    };
+    expect(toPool(api, "2053-03-01")).toMatchObject({ tl: true, ll: false });
+  });
+});

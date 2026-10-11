@@ -55,3 +55,10 @@ describe("contractLabel", () => {
     expect(contractLabel(0, undefined)).toBe("Expired");
   });
 });
+
+describe("transfer listed tag", () => {
+  it("tags a transfer-listed player", () => {
+    expect(asCandidate({ ca: 100, pa: 100, tl: true }).tags).toEqual(["tl"]);
+    expect(asCandidate({ ca: 100, pa: 100, tl: false }).tags).toEqual([]);
+  });
+});

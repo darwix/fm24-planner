@@ -143,3 +143,28 @@ fn month_to_month_block_can_sit_far_before_the_row() {
     w.extend([0u8; 30]);
     assert!(find(&w, id).month_to_month);
 }
+
+// Sebastian Breier (LASK, month-to-month since 2049-01-01): only four FF bytes lead the block,
+// [6A 0C 00 00][FF x4][02 00 6C 07][01 16 01 08]. The marker is the exact end value 1900 day 2;
+// 1900 day 1 is the common blank date and must not count.
+#[test]
+fn month_to_month_marker_after_four_ff_bytes() {
+    use fm_savelens_backend::adapters::parser::records::contract::find;
+    let id: u32 = 528967;
+    let window = |end: [u8; 4]| {
+        let mut w = vec![0u8; 100];
+        w.extend([0x6a, 0x0c, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff]);
+        w.extend(end);
+        w.extend([0x01, 0x16, 0x01, 0x08]); // start 2049-01-01
+        w.extend([0u8; 80]);
+        w.extend(id.to_le_bytes());
+        w.extend(127u32.to_le_bytes());
+        w.extend([0; 4]);
+        w.extend(3972u32.to_le_bytes());
+        w.extend([1, 0, 0]);
+        w.extend([0u8; 30]);
+        w
+    };
+    assert!(find(&window([0x02, 0x00, 0x6c, 0x07]), id).month_to_month);
+    assert!(!find(&window([0x01, 0x00, 0x6c, 0x07]), id).month_to_month);
+}

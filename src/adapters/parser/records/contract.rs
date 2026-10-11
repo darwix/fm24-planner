@@ -73,7 +73,6 @@ pub fn for_people(
     for &(person, ability) in &linked.pairs {
         check(cancel)?;
         let wide = &db[person.offset.saturating_sub(OWN_WINDOW)..person.offset];
-        let near = &wide[wide.len().saturating_sub(WINDOW)..];
         let id = person.id as u32;
         let own = team_club.get(&ability.team);
         let non_contract = own
@@ -81,7 +80,7 @@ pub fn for_people(
         let found = if non_contract {
             Contract::default()
         } else {
-            find(near, id)
+            find_wide(wide, id)
         };
         contracts.push(Contract {
             value: value(db, ability.offset),
@@ -120,6 +119,20 @@ pub fn non_contract(window: &[u8], person_id: u32, is_own: impl Fn(u32) -> bool)
 pub fn value(db: &[u8], ability_offset: usize) -> Option<u32> {
     let at = ability_offset + Ability::ATTRIBUTES;
     (at + 4 <= db.len()).then(|| u32(db, at))
+}
+
+/// `find` on the last 800 bytes of `wide`; only the month-to-month marker is looked for further
+/// back, since a wage row near the window's start (Lübcke) can have it just before the window.
+pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
+    let skip = wide.len().saturating_sub(WINDOW);
+    let near = &wide[skip..];
+    let found = find(near, person_id);
+    let rolling = found.month_to_month
+        || wage_anchor(near, person_id).is_some_and(|at| month_to_month(wide, skip + at));
+    Contract {
+        month_to_month: rolling,
+        ..found
+    }
 }
 
 /// Wage, team and contract end from `window`, the bytes before the person record.

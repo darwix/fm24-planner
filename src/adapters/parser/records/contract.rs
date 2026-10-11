@@ -153,11 +153,19 @@ pub fn find_wide(wide: &[u8], person_id: u32) -> Contract {
     // a month-to-month deal has no end (an older block's would hide it); an amateur's old paid
     // row is not its contract
     let paid = found.wage.is_some() && !rolling;
+    // the list's first row is the contract the game shows (the parent one for a loan); later
+    // rows are older or loan rows and approaches
+    let wage = rows(wide, person_id)
+        .next()
+        .map(|at| u32(wide, at + WAGE))
+        .filter(|&w| w > 0 && found.wage.is_some_and(|f| f > 0))
+        .or(found.wage);
     let contract_end = found
         .contract_end
         .clone()
         .or_else(|| anchor.filter(|_| paid).and_then(|at| terms_end(wide, at)));
     Contract {
+        wage,
         month_to_month: rolling,
         contract_end,
         ..found

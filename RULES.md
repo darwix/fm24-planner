@@ -70,10 +70,11 @@ Name, Club, Contract Type (F/PT), Salary, Expires. The test save's export has 54
 
 1. Build the server with a separate `CARGO_TARGET_DIR`, run it on another port with its own
    `FM_SAVELENS_24_DATA_DIR`, import the save.
-2. Match export rows to snapshot players by name (or surname-first) + club.
-3. Per contract type, count: expired agree; end equal; wage within the game's display rounding
-   (max of £15 or 6%).
-4. Diff the new snapshot against the previous one; every changed player must be a fix.
+2. `python -I scripts/check-contracts.py <export.html> <new snapshot.sqlite> [<previous snapshot.sqlite>]`
+   matches export rows to players by name (or surname-first) + club and counts, per contract
+   type, expired agreement, equal ends and wages within the game's display rounding (max of
+   £15 or 6%). With a previous snapshot it lists every player whose wage or end changed; each
+   must be a fix.
 
 Baseline at `fm24-rust-47-fm` (54,308 matched): expired 100%; end 38,031 of 38,031; wage 38,019
 right, 87 month-to-month with no wage (by design), 0 wrong.

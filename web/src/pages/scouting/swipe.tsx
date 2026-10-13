@@ -313,6 +313,9 @@ export default function Swipe() {
           Swipe right to shortlist, left to pass
           {total !== undefined && ` · ${total.toLocaleString()} match`}
         </span>
+        <button className="btn" onClick={() => nav("/scouting/shortlist")}>
+          Shortlist ({kept.length})
+        </button>
         <button
           className="btn"
           onClick={() => {

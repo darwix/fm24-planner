@@ -60,6 +60,7 @@ export const toPool = (p: ApiPlayer, gameDate: string): PoolPlayer => ({
   cl: p.club ?? "",
   nat: p.nationalities[0] ?? "",
   p: p.positions[0],
+  pos: p.positions,
   a: p.age,
   ca: p.ca,
   pa: p.pa,

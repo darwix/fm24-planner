@@ -27,6 +27,8 @@ export interface PoolPlayer {
   cl: string;
   nat: string;
   p: string;
+  // every position he can play (missing on players kept before it was stored)
+  pos?: string[];
   a: number;
   ca: number;
   pa: number;

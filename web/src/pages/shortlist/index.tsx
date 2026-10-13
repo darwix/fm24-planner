@@ -117,11 +117,6 @@ export default function Shortlist() {
 
   return (
     <section className="slw">
-      <div className="sw-head">
-        <button className="btn" onClick={() => nav("/scouting/swipe")}>
-          ← Swipe
-        </button>
-      </div>
       <div className="sum">
         <h2>Shortlist</h2>
         <span>

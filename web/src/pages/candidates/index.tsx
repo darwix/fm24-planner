@@ -1,5 +1,5 @@
 import "./candidates.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
 import {
@@ -9,11 +9,18 @@ import {
   vacantState,
 } from "@/atoms/squadState";
 import Delta from "@/components/Delta";
-import { TAG, type Candidate, type Tag } from "@/models/player";
+import {
+  TAG,
+  type Candidate,
+  type PoolPlayer,
+  type Tag,
+} from "@/models/player";
+import { getPlanner } from "@/services/planner";
 import { useSearch } from "@/services/save";
 import { money, wage } from "@/utils/format";
 import { asCandidate, contractLabel, inGroup } from "@/utils/logic";
 import { POS_INDEX, toPool } from "@/utils/player";
+import { canPlay } from "@/utils/shortlist";
 
 export default function Shortlist() {
   const nav = useNavigate();
@@ -24,6 +31,14 @@ export default function Shortlist() {
   const [vacant, setVacant] = useRecoilState(vacantState);
   const sel = useRecoilValue(selectedState);
   const [on, setOn] = useState<Tag[]>(["exp", "cheap", "tl"]);
+  // outside the club only your shortlist (players kept while scouting) is offered
+  const [kept, setKept] = useState<PoolPlayer[]>([]);
+  useEffect(() => {
+    if (club)
+      getPlanner<PoolPlayer[]>(club.snapshotId, "kept")
+        .then((k) => setKept(k ?? []))
+        .catch(console.error);
+  }, [club]);
   const t = squad[sel] ?? squad[0];
   const pos = addPos ?? t?.p;
   // target CA: the player being replaced, or the squad average when adding cover
@@ -65,13 +80,24 @@ export default function Shortlist() {
       },
     }))
     .sort((a, b) => b.c.m - a.c.m);
-  // squad players stay in the list unless "From your club" already shows them,
-  // so one player can be cover for several groups
-  const list: Candidate[] = (found ?? [])
-    .filter((p) => p.id !== (addPos ? undefined : t.id))
-    .filter((p) => !own.some(({ c }) => c.id === p.id))
-    .map((p) => asCandidate({ ...toPool(p, club.gameDate), p: pos }, ref))
-    .filter((c) => c.tags.some((g) => on.includes(g)))
+  const searched = (found ?? []).map((p) => toPool(p, club.gameDate));
+  const fresh = (p: PoolPlayer) =>
+    p.id !== (addPos ? undefined : t.id) && !own.some(({ c }) => c.id === p.id);
+  // the rest of your club: players outside the planner squad, and (when replacing)
+  // squad players of other groups; adding cover skips those already in the group
+  const clubList: Candidate[] = searched
+    .filter((p) => p.cl === club.name && fresh(p))
+    .filter(
+      (p) => !addPos || !squad.some((s) => s.id === p.id && inGroup(s, addPos)),
+    )
+    .map((p) => asCandidate({ ...p, p: pos }, ref))
+    .sort((a, b) => b.m - a.m);
+  const list: Candidate[] = kept
+    .filter((k) => canPlay(k, pos!))
+    .filter((p) => p.cl !== club.name && fresh(p))
+    .map((p) => asCandidate({ ...p, p: pos }, ref))
+    // chips hide tagged players whose tags are all off; untagged kept players stay
+    .filter((c) => !c.tags.length || c.tags.some((g) => on.includes(g)))
     .sort((a, b) => b.m - a.m);
   const ownLabel = (i: number) =>
     addPos || !t.xi ? "Use as cover" : squad[i].xi ? "Swap spots" : "Promote";
@@ -183,6 +209,15 @@ export default function Shortlist() {
     </div>
   );
 
+  const pick = (c: Candidate) => {
+    const i = squad.findIndex((s) => s.id === c.id);
+    return i >= 0
+      ? card(c, ownLabel(i), () => promote(i))
+      : card(c, addPos ? "Add to squad" : "Swap in", () =>
+          addPos ? add(c) : swap(c),
+        );
+  };
+
   return (
     <section className="wrap2">
       {addPos ? (
@@ -227,17 +262,19 @@ export default function Shortlist() {
         </div>
       )}
       <div>
-        {own.length > 0 && (
+        {own.length + clubList.length > 0 && (
           <>
             <h2>From your club</h2>
             <div className="sub">
-              {own.length} {own.length === 1 ? "player" : "players"} who can
-              play {pos}
+              {own.length + clubList.length}{" "}
+              {own.length + clubList.length === 1 ? "player" : "players"} who
+              can play {pos}
             </div>
             {own.map(({ i, c }) => card(c, ownLabel(i), () => promote(i)))}
+            {clubList.map(pick)}
           </>
         )}
-        <h2>Shortlist</h2>
+        <h2>Your shortlist</h2>
         <div className="sub">
           {found
             ? `Ranked by CA match · ${list.length} ${list.length === 1 ? "player" : "players"}`
@@ -254,17 +291,13 @@ export default function Shortlist() {
             </span>
           ))}
         </div>
-        {list.map((c) =>
-          squad.some((s) => s.id === c.id)
-            ? card(c, ownLabel(squad.findIndex((s) => s.id === c.id)), () =>
-                promote(squad.findIndex((s) => s.id === c.id)),
-              )
-            : card(c, addPos ? "Add to squad" : "Swap in", () =>
-                addPos ? add(c) : swap(c),
-              ),
-        )}
+        {list.map(pick)}
         {found && !list.length && (
-          <div className="sub">No matches. Turn a filter back on.</div>
+          <div className="sub">
+            {kept.some((k) => canPlay(k, pos!))
+              ? "No matches. Turn a filter back on."
+              : `Nobody on your shortlist plays ${pos}. Scout for one.`}
+          </div>
         )}
       </div>
     </section>

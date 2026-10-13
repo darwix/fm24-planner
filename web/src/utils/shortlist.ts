@@ -6,6 +6,9 @@ export const stars = (ca: number, pa: number) => ({
   pa: Math.round(pa / 20) / 2,
 });
 
+export const canPlay = (p: PoolPlayer, pos: string) =>
+  (p.pos ?? [p.p]).includes(pos);
+
 export type SortKey = "n" | "p" | "ca" | "v" | "left" | "w";
 export interface ShortlistFilter {
   pos: string[];

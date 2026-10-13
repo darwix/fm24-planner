@@ -46,6 +46,7 @@ export function toSquadPlayer(p: ApiPlayer, gameDate: string): SquadPlayer {
     n: p.name,
     p: q.p,
     pos: p.positions,
+    cl: p.club ?? "",
     a: p.age,
     ca: p.ca,
     pa: p.pa,

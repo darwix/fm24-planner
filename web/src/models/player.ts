@@ -5,6 +5,8 @@ export interface SquadPlayer {
   n: string;
   p: string;
   pos?: string[];
+  // real club in the save ("" = free agent); differs from yours for a planned signing
+  cl?: string;
   // extra groups he is counted as cover in, besides p
   cover?: string[];
   a: number;

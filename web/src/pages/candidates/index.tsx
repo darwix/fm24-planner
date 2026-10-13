@@ -60,8 +60,8 @@ export default function Shortlist() {
   if (!squad.length || !club) return <Navigate to="/upload" replace />;
 
   const K = addPos ? [] : Object.keys(t.at);
-  // cover at the same position already at the club, ready to step into the XI
-  const own = squad
+  // cover at the same position already in the squad plan, ready to step into the XI
+  const able = squad
     .map((s, i) => ({ s, i }))
     .filter(({ s, i }) =>
       addPos
@@ -75,11 +75,18 @@ export default function Shortlist() {
     .map(({ s, i }) => ({
       i,
       c: {
-        ...asCandidate({ ...s, id: s.id as number, cl: club.name }, ref),
+        ...asCandidate(
+          { ...s, id: s.id as number, cl: s.cl || club.name },
+          ref,
+        ),
         at: s.at,
       },
     }))
     .sort((a, b) => b.c.m - a.c.m);
+  // planned signings from another club show with the shortlist, not as your club
+  const mine = (s: { cl?: string }) => s.cl === undefined || s.cl === club.name;
+  const own = able.filter(({ i }) => mine(squad[i]));
+  const signed = able.filter(({ i }) => !mine(squad[i])).map(({ c }) => c);
   const searched = (found ?? []).map((p) => toPool(p, club.gameDate));
   const fresh = (p: PoolPlayer) =>
     p.id !== (addPos ? undefined : t.id) && !own.some(({ c }) => c.id === p.id);
@@ -95,9 +102,11 @@ export default function Shortlist() {
   const list: Candidate[] = kept
     .filter((k) => canPlay(k, pos!))
     .filter((p) => p.cl !== club.name && fresh(p))
+    .filter((p) => !squad.some((s) => s.id === p.id))
     .map((p) => asCandidate({ ...p, p: pos }, ref))
     // chips hide tagged players whose tags are all off; untagged kept players stay
     .filter((c) => !c.tags.length || c.tags.some((g) => on.includes(g)))
+    .concat(signed)
     .sort((a, b) => b.m - a.m);
   const ownLabel = (i: number) =>
     addPos || !t.xi ? "Use as cover" : squad[i].xi ? "Swap spots" : "Promote";
@@ -145,6 +154,7 @@ export default function Shortlist() {
   const fields = (c: Candidate) => ({
     id: c.id,
     n: c.n,
+    cl: c.cl,
     a: c.a,
     ca: c.ca,
     pa: c.pa,

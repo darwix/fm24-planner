@@ -41,6 +41,7 @@ export default function Scouting() {
       {
         id: p.id,
         n: p.n,
+        cl: p.cl,
         p: p.p,
         a: p.a,
         ca: p.ca,

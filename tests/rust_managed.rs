@@ -1,5 +1,5 @@
 // Managed club comes from the length-prefixed club name in save_game_summary.dat.
-use fm_savelens_backend::adapters::parser::managed_club_id;
+use fm_squad_planner::adapters::parser::managed_club_id;
 
 fn pstr(s: &str) -> Vec<u8> {
     let mut v = (s.len() as u32).to_le_bytes().to_vec();

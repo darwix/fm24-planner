@@ -1,6 +1,6 @@
 mod support;
-use fm_savelens_backend::domain::entities::{ParsedSave, Player, CATALOG};
-use fm_savelens_backend::utils::cancel::CancelFlag;
+use fm_squad_planner::domain::entities::{ParsedSave, Player, CATALOG};
+use fm_squad_planner::utils::cancel::CancelFlag;
 use serde_json::{json, Value};
 
 fn fixture() -> Value {

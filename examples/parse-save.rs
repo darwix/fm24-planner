@@ -1,9 +1,9 @@
-use fm_savelens_backend::adapters::parser::parse_save;
+use fm_squad_planner::adapters::parser::parse_save;
 use std::{
     io::{self, Write},
     path::Path,
 };
-use fm_savelens_backend::utils::cancel::CancelFlag;
+use fm_squad_planner::utils::cancel::CancelFlag;
 fn main() {
     let path = std::env::args().nth(1).expect("usage: parse-save FILE.fm");
     let value = match parse_save(Path::new(&path), &CancelFlag::new(), |_, _| {}) {

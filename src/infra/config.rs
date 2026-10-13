@@ -17,10 +17,10 @@ pub enum Command {
 
 impl AppConfig {
     pub fn from_args(args: impl Iterator<Item = String>) -> Result<Command> {
-        let mut port = match std::env::var("FM_SAVELENS_24_PORT") {
+        let mut port = match std::env::var("FM_SQUAD_PLANNER_PORT") {
             Ok(p) => p
                 .parse::<u16>()
-                .map_err(|_| Error::query("Invalid FM_SAVELENS_24_PORT."))?,
+                .map_err(|_| Error::query("Invalid FM_SQUAD_PLANNER_PORT."))?,
             Err(_) => DEFAULT_PORT,
         };
         let mut no_open = false;
@@ -36,10 +36,10 @@ impl AppConfig {
                         .parse()
                         .map_err(|_| Error::query("Invalid port."))?
                 }
-                "--version" => return Ok(Command::Print(format!("FM SaveLens 24 {VERSION}"))),
+                "--version" => return Ok(Command::Print(format!("FM Squad Planner {VERSION}"))),
                 "--help" => {
                     return Ok(Command::Print(
-                        "FM SaveLens 24 server [--port PORT] [--no-open]\nFM_SAVELENS_24_DATA_DIR overrides local storage. Stop with Ctrl+C.".into(),
+                        "FM Squad Planner server [--port PORT] [--no-open]\nFM_SQUAD_PLANNER_DATA_DIR overrides local storage. Stop with Ctrl+C.".into(),
                     ))
                 }
                 _ => return Err(Error::query(format!("Unknown option: {arg}"))),
@@ -54,7 +54,7 @@ impl AppConfig {
 }
 
 pub fn default_data_dir() -> PathBuf {
-    std::env::var_os("FM_SAVELENS_24_DATA_DIR")
+    std::env::var_os("FM_SQUAD_PLANNER_DATA_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             dirs::data_local_dir()

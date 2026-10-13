@@ -23,7 +23,7 @@ impl DataDir {
         lock.try_lock_exclusive().map_err(|_| {
             Error::new(
                 "ALREADY_RUNNING",
-                "FM SaveLens 24 is already using this data directory. Close it before starting another instance.",
+                "FM Squad Planner is already using this data directory. Close it before starting another instance.",
             )
         })?;
         let data = Self { root, _lock: lock };

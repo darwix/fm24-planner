@@ -50,9 +50,7 @@ export default function Upload() {
       .then(setSaves)
       .catch(() => {
         setSaves([]);
-        setErr(
-          "Can't reach the SaveLens backend on port 4242. Start it and reload.",
-        );
+        setErr("Can't reach the backend on port 4242. Start it and reload.");
       });
   }, []);
 

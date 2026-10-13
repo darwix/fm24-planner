@@ -8,4 +8,4 @@ pub mod utils;
 pub use error::{Error, Result};
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const APP_ID: &str = "io.github.MSalman5230.FMSaveLens24";
+pub const APP_ID: &str = "io.github.darwix.FMSquadPlanner";

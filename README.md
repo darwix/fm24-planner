@@ -18,7 +18,7 @@ Needs Node.js 24.14+ and Rust (pinned in `rust-toolchain.toml`).
 ```sh
 npm --prefix web ci
 npm run build:web
-cargo run --release --bin fm-savelens-24-server -- --no-open --port 4242
+cargo run --release --bin fm-squad-planner-server -- --no-open --port 4242
 ```
 
 Open [localhost:4242](http://localhost:4242). For frontend hot reload, run `npm run dev` in `web/` and open [localhost:5173](http://localhost:5173); it proxies `/api` to the server on :4242.

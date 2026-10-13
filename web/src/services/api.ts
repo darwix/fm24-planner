@@ -1,6 +1,6 @@
 import axios from "axios";
 
-// the dev server proxies /api to the SaveLens backend (see vite.config.ts)
+// the dev server proxies /api to the backend (see vite.config.ts)
 export const api = axios.create({ baseURL: "" });
 
 const fail = (error: any) =>

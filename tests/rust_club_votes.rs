@@ -1,5 +1,5 @@
 // A team whose own record names no club still has players whose contract names one (Fram's 19432).
-use fm_savelens_backend::adapters::parser::records::teams::club_by_contract;
+use fm_squad_planner::adapters::parser::records::teams::club_by_contract;
 use std::collections::HashSet;
 
 fn clubs() -> HashSet<u32> {
@@ -27,7 +27,7 @@ fn a_tie_picks_no_club() {
 // Free agents carry team u32::MAX; leftover contract fields must not vote them into a club.
 #[test]
 fn free_agents_get_no_club_from_votes() {
-    use fm_savelens_backend::adapters::parser::records::teams::player_clubs;
+    use fm_squad_planner::adapters::parser::records::teams::player_clubs;
     let free = u32::MAX;
     let players = [(1, free, Some(641)), (2, free, Some(641)), (3, free, None)];
     assert_eq!(
@@ -40,7 +40,7 @@ fn free_agents_get_no_club_from_votes() {
 // 19459, no record) votes 650: team ordinal 649 is Niort (471), while club id 650 is Beitar.
 #[test]
 fn contract_team_field_resolves_through_the_team_ordinal() {
-    use fm_savelens_backend::adapters::parser::records::teams::{player_clubs, Team};
+    use fm_squad_planner::adapters::parser::records::teams::{player_clubs, Team};
     let niort = Team {
         club: Some(471),
         ordinal: 649,
@@ -64,7 +64,7 @@ fn contract_team_field_resolves_through_the_team_ordinal() {
 // Guarany's team (3145).
 #[test]
 fn club_team_list_wins_over_a_misattached_roster() {
-    use fm_savelens_backend::adapters::parser::records::teams::{player_clubs, Team};
+    use fm_squad_planner::adapters::parser::records::teams::{player_clubs, Team};
     let guarany = Team {
         club: Some(2909),
         ordinal: 3145,
@@ -83,7 +83,7 @@ fn club_team_list_wins_over_a_misattached_roster() {
 // holds him (US Ansoise trialists).
 #[test]
 fn free_agent_on_a_roster_has_no_club() {
-    use fm_savelens_backend::adapters::parser::records::teams::{player_clubs, Team};
+    use fm_squad_planner::adapters::parser::records::teams::{player_clubs, Team};
     let ansoise = Team {
         club: Some(5095),
         ordinal: 7000,

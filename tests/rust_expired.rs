@@ -1,6 +1,6 @@
 // Contracts the game no longer honours must not reach the snapshot: a free agent's leftover
 // contract (Matthias Ziegler, FrA in-game, decoded £307/week to 2054) and one already past.
-use fm_savelens_backend::adapters::parser::records::contract::Contract;
+use fm_squad_planner::adapters::parser::records::contract::Contract;
 
 fn contract(end: &str) -> Contract {
     Contract {
@@ -38,7 +38,7 @@ fn running_contract_is_kept() {
 // these players as out of contract.
 #[test]
 fn month_to_month_contract_counts_as_expired() {
-    use fm_savelens_backend::adapters::parser::records::contract::find;
+    use fm_squad_planner::adapters::parser::records::contract::find;
     let id: u32 = 550384;
     let mut w = vec![0u8; 100];
     w.extend([0xff; 8]);
@@ -62,7 +62,7 @@ fn month_to_month_contract_counts_as_expired() {
 // (see rust_contract.rs, Ruiz), so this does not affect loans.
 #[test]
 fn zero_wage_first_row_means_no_paid_contract() {
-    use fm_savelens_backend::adapters::parser::records::contract::find;
+    use fm_squad_planner::adapters::parser::records::contract::find;
     let id: u32 = 605612;
     let row = |team: u32, wage: u32| {
         let mut r = id.to_le_bytes().to_vec();
@@ -85,7 +85,7 @@ fn zero_wage_first_row_means_no_paid_contract() {
 // date (01 00 6C 07 = 1900-01-01) where an amateur row has FF; his paid contract still counts.
 #[test]
 fn zero_wage_row_with_a_blank_date_keeps_the_paid_contract() {
-    use fm_savelens_backend::adapters::parser::records::contract::find;
+    use fm_squad_planner::adapters::parser::records::contract::find;
     let id: u32 = 700001;
     let row = |team: u32, wage: u32, tail: [u8; 4]| {
         let mut r = id.to_le_bytes().to_vec();
@@ -107,7 +107,7 @@ fn zero_wage_row_with_a_blank_date_keeps_the_paid_contract() {
 // dated block (2050-01-02 / 2050-01-20) sits between it and the wage row.
 #[test]
 fn month_to_month_block_need_not_be_the_nearest() {
-    use fm_savelens_backend::adapters::parser::records::contract::find;
+    use fm_squad_planner::adapters::parser::records::contract::find;
     let id: u32 = 530570;
     let mut w = vec![0u8; 100];
     w.extend([0xff; 8]);
@@ -129,7 +129,7 @@ fn month_to_month_block_need_not_be_the_nearest() {
 // before the wage row.
 #[test]
 fn month_to_month_block_can_sit_far_before_the_row() {
-    use fm_savelens_backend::adapters::parser::records::contract::find;
+    use fm_squad_planner::adapters::parser::records::contract::find;
     let id: u32 = 107923;
     let mut w = vec![0u8; 100];
     w.extend([0xff; 8]);
@@ -149,7 +149,7 @@ fn month_to_month_block_can_sit_far_before_the_row() {
 // 1900 day 1 is the common blank date and must not count.
 #[test]
 fn month_to_month_marker_after_four_ff_bytes() {
-    use fm_savelens_backend::adapters::parser::records::contract::find;
+    use fm_squad_planner::adapters::parser::records::contract::find;
     let id: u32 = 528967;
     let window = |end: [u8; 4]| {
         let mut w = vec![0u8; 100];
@@ -174,7 +174,7 @@ fn month_to_month_marker_after_four_ff_bytes() {
 // other clubs. A loan row at the borrowing club is type 1, and a full-time own row is paid.
 #[test]
 fn own_club_row_with_zero_wage_and_type_3_is_a_non_contract() {
-    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    use fm_squad_planner::adapters::parser::records::contract::non_contract;
     let id: u32 = 424692;
     let row = |team: u32, wage: u32, kind: u8| {
         let mut r = id.to_le_bytes().to_vec();
@@ -202,7 +202,7 @@ fn own_club_row_with_zero_wage_and_type_3_is_a_non_contract() {
 // usually a real contract's side row, so only far ones count.
 #[test]
 fn far_zero_wage_own_club_row_is_a_non_contract() {
-    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    use fm_squad_planner::adapters::parser::records::contract::non_contract;
     let id: u32 = 639666;
     let row = |team: u32, tail: [u8; 4]| {
         let mut r = id.to_le_bytes().to_vec();
@@ -242,7 +242,7 @@ fn far_zero_wage_own_club_row_is_a_non_contract() {
 // but the row before it has a wage (£273), so he holds a paid contract.
 #[test]
 fn far_own_club_row_after_a_paid_row_is_not_a_non_contract() {
-    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    use fm_squad_planner::adapters::parser::records::contract::non_contract;
     let id: u32 = 605300;
     let row = |team: u32, wage: u32, tail: [u8; 4]| {
         let mut r = id.to_le_bytes().to_vec();
@@ -266,7 +266,7 @@ fn far_own_club_row_after_a_paid_row_is_not_a_non_contract() {
 // too, but its tail is 03 2F 00 00, not FF like a non-contract's.
 #[test]
 fn type_3_own_club_row_without_ff_is_a_loan() {
-    use fm_savelens_backend::adapters::parser::records::contract::non_contract;
+    use fm_squad_planner::adapters::parser::records::contract::non_contract;
     let id: u32 = 600001;
     let mut w = vec![0u8; 100];
     w.extend(id.to_le_bytes());
@@ -282,7 +282,7 @@ fn type_3_own_club_row_without_ff_is_a_loan() {
 // person record, so the marker 47 bytes before that row lies outside the 800-byte window.
 #[test]
 fn month_to_month_marker_before_the_window_still_counts() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let id: u32 = 512658;
     let mut w = vec![0u8; 1000];
     w.extend([0xff; 4]);

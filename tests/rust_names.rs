@@ -1,4 +1,4 @@
-use fm_savelens_backend::adapters::parser::records::people::display_name;
+use fm_squad_planner::adapters::parser::records::people::display_name;
 
 #[test]
 fn nickname_wins_over_first_and_last() {
@@ -18,7 +18,7 @@ fn no_nickname_falls_back_to_first_and_last() {
 // The nickname index reads from three pools (checked on Francisco Miguel, Juanma, Casemiro).
 #[test]
 fn nickname_index_picks_common_then_own_first_then_last_pool() {
-    use fm_savelens_backend::adapters::parser::records::{names::Names, people::nickname};
+    use fm_squad_planner::adapters::parser::records::{names::Names, people::nickname};
     let pool = |v: &[&str]| v.iter().map(|s| s.to_string()).collect();
     let names = Names {
         first: pool(&["Juan", "Francisco Miguel", "Pedro"]),

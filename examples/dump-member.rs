@@ -1,5 +1,5 @@
-use fm_savelens_backend::adapters::parser::archive::Archive;
-use fm_savelens_backend::utils::cancel::CancelFlag;
+use fm_squad_planner::adapters::parser::archive::Archive;
+use fm_squad_planner::utils::cancel::CancelFlag;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let c = CancelFlag::new();

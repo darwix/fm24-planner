@@ -23,7 +23,7 @@ async fn health(State(app): State<Shared>) -> Response {
         200,
         HealthResponse {
             app: "fm24-scout",
-            product_name: "FM SaveLens 24",
+            product_name: "FM Squad Planner",
             version: VERSION,
             parser_version: app.saves.parser_version().to_owned(),
         },

@@ -1,4 +1,4 @@
-use fm_savelens_backend::{
+use fm_squad_planner::{
     application::use_cases::wait_for,
     infra::{
         app::create_app,
@@ -41,7 +41,7 @@ async fn run() -> Result<()> {
             .with_graceful_shutdown(cancel.cancelled_owned())
             .await
     });
-    println!("FM SaveLens 24: {url}");
+    println!("FM Squad Planner: {url}");
     println!(
         "{}",
         json!({"ready":true,"port":address.port(),"version":VERSION})

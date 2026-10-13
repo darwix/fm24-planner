@@ -1,5 +1,5 @@
 [package]
-name = "fm-savelens-backend"
+name = "fm-squad-planner"
 version = "1.4.0"
 edition = "2021"
 publish = false
@@ -9,7 +9,7 @@ description = "Read-only Football Manager 2024 save database"
 path = "src/lib.rs"
 
 [[bin]]
-name = "fm-savelens-24-server"
+name = "fm-squad-planner-server"
 path = "src/main.rs"
 
 [dependencies]

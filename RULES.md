@@ -94,7 +94,7 @@ Ground truth is an in-game Player Search export of all players (Ctrl+P, Web Page
 Name, Club, Contract Type (F/PT), Salary, Expires. The test save's export has 54,383 players.
 
 1. Build the server with a separate `CARGO_TARGET_DIR`, run it on another port with its own
-   `FM_SAVELENS_24_DATA_DIR`, import the save.
+   `FM_SQUAD_PLANNER_DATA_DIR`, import the save.
 2. `python -I scripts/check-contracts.py <export.html> <new snapshot.sqlite> [<previous snapshot.sqlite>]`
    matches export rows to players by name (or surname-first) + club and counts, per contract
    type, expired agreement, equal ends and wages within the game's display rounding (max of

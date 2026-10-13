@@ -1,6 +1,6 @@
 mod support;
-use fm_savelens_backend::adapters::parser::parse_save;
-use fm_savelens_backend::utils::cancel::CancelFlag;
+use fm_squad_planner::adapters::parser::parse_save;
+use fm_squad_planner::utils::cancel::CancelFlag;
 use serde_json::json;
 
 #[test]
@@ -67,7 +67,7 @@ fn unknown_value() {
 
 #[test]
 fn post_body_becomes_the_same_query_as_get() {
-    let q = fm_savelens_backend::adapters::http::routes::players::filter::query_from_body(&json!({
+    let q = fm_squad_planner::adapters::http::routes::players::filter::query_from_body(&json!({
         "ageMin": 18, "mainPosition": [3, 12], "valueUnknown": true, "q": "a b", "skip": null,
     }));
     let pairs: std::collections::HashMap<_, _> = url::form_urlencoded::parse(q.as_bytes())

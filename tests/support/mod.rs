@@ -125,14 +125,14 @@ pub fn write_archive(path: &Path, compressed: bool, members: Vec<(&str, Vec<u8>)
 pub struct TestSnapshot {
     /// The SQLite file, for tests that adjust rows directly.
     pub path: std::path::PathBuf,
-    id: fm_savelens_backend::domain::entities::SnapshotId,
-    players: fm_savelens_backend::adapters::persistence::SqlitePlayerRepository,
+    id: fm_squad_planner::domain::entities::SnapshotId,
+    players: fm_squad_planner::adapters::persistence::SqlitePlayerRepository,
 }
 #[allow(dead_code)]
 impl TestSnapshot {
     /// Parses `query` and searches the snapshot, giving the page as JSON.
-    pub fn search(&self, query: &str) -> fm_savelens_backend::Result<serde_json::Value> {
-        use fm_savelens_backend::{
+    pub fn search(&self, query: &str) -> fm_squad_planner::Result<serde_json::Value> {
+        use fm_squad_planner::{
             adapters::http::routes::players::filter::parse_filter,
             application::use_cases::players::PlayerRepository,
         };
@@ -142,9 +142,9 @@ impl TestSnapshot {
     pub fn player(
         &self,
         id: u32,
-    ) -> fm_savelens_backend::Result<Option<fm_savelens_backend::domain::entities::PlayerDetail>>
+    ) -> fm_squad_planner::Result<Option<fm_squad_planner::domain::entities::PlayerDetail>>
     {
-        use fm_savelens_backend::application::use_cases::players::PlayerRepository;
+        use fm_squad_planner::application::use_cases::players::PlayerRepository;
         self.players.player(&self.id, id)
     }
 }
@@ -153,10 +153,10 @@ impl TestSnapshot {
 #[allow(dead_code)]
 pub fn create_snapshot(
     dir: &Path,
-    save: fm_savelens_backend::domain::entities::ParsedSave,
-    cancel: &fm_savelens_backend::utils::cancel::CancelFlag,
-) -> fm_savelens_backend::Result<TestSnapshot> {
-    use fm_savelens_backend::{
+    save: fm_squad_planner::domain::entities::ParsedSave,
+    cancel: &fm_squad_planner::utils::cancel::CancelFlag,
+) -> fm_squad_planner::Result<TestSnapshot> {
+    use fm_squad_planner::{
         adapters::persistence::{SqlitePlayerRepository, SqliteSnapshotRepository},
         application::use_cases::saves::SnapshotRepository,
         domain::entities::{NewSnapshot, SnapshotId},
@@ -178,8 +178,8 @@ pub fn create_snapshot(
 #[allow(dead_code)]
 pub fn save_use_case(
     snapshots: std::path::PathBuf,
-) -> fm_savelens_backend::application::use_cases::SaveUseCase {
-    use fm_savelens_backend::{
+) -> fm_squad_planner::application::use_cases::SaveUseCase {
+    use fm_squad_planner::{
         adapters::{
             parser::reader::FmSaveReader,
             persistence::{FsSaveFiles, SqliteSnapshotRepository},
@@ -193,14 +193,14 @@ pub fn save_use_case(
     use std::sync::Arc;
     struct MemorySettings;
     impl SettingsRepository for MemorySettings {
-        fn load(&self) -> fm_savelens_backend::Result<Settings> {
+        fn load(&self) -> fm_squad_planner::Result<Settings> {
             Ok(Settings {
                 folder: String::new(),
                 last_snapshot: None,
                 session: None,
             })
         }
-        fn save(&self, _: &Settings) -> fm_savelens_backend::Result<()> {
+        fn save(&self, _: &Settings) -> fm_squad_planner::Result<()> {
             Ok(())
         }
     }
@@ -212,7 +212,7 @@ pub fn save_use_case(
     )
 }
 
-use fm_savelens_backend::{
+use fm_squad_planner::{
     adapters::http::app_state::Shared,
     application::use_cases::wait_for,
     infra::{app::create_app, data_dir::DataDir, setup::init_app_state},

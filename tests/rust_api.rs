@@ -401,7 +401,7 @@ async fn api_import_security_and_shutdown() {
                 .unwrap()
         )
         .await["version"],
-        fm_savelens_backend::VERSION
+        fm_squad_planner::VERSION
     );
     assert_eq!(
         client

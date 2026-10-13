@@ -1,6 +1,6 @@
 mod support;
-use fm_savelens_backend::utils::cancel::CancelFlag;
-use fm_savelens_backend::{
+use fm_squad_planner::utils::cancel::CancelFlag;
+use fm_squad_planner::{
     adapters::parser::{archive::Archive, parse_save, PARSER_VERSION},
     adapters::persistence::SqliteSnapshotRepository,
     application::use_cases::saves::SnapshotRepository,
@@ -20,7 +20,7 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
     file.set_times(fs::FileTimes::new().set_modified(modified))
         .unwrap();
     let stat = file.metadata().unwrap();
-    let source_mtime = fm_savelens_backend::utils::files::mtime(&stat).unwrap();
+    let source_mtime = fm_squad_planner::utils::files::mtime(&stat).unwrap();
     let cancel = CancelFlag::new();
     let save = parse_save(&path, &cancel, |_, _| {}).unwrap();
     let snapshots = dir.path().join("snapshots");
@@ -119,7 +119,7 @@ fn compressed_and_plain_records_match_and_query_correctly() {
 
 #[test]
 fn cached_timestamps_round_trip_and_staleness_still_detects_source_changes() {
-    use fm_savelens_backend::{adapters::parser::PARSER_VERSION, utils::files::mtime};
+    use fm_squad_planner::{adapters::parser::PARSER_VERSION, utils::files::mtime};
     use rusqlite::Connection;
     use serde_json::Value;
     use std::time::{Duration, UNIX_EPOCH};

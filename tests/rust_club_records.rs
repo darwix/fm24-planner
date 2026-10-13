@@ -1,5 +1,5 @@
 // Club records: [id][uid][uid][00][nation][FF x4][u32][nation again] .. [name len][name]...
-use fm_savelens_backend::{adapters::parser::records::clubs, utils::cancel::CancelFlag};
+use fm_squad_planner::{adapters::parser::records::clubs, utils::cancel::CancelFlag};
 
 fn record(nations: [u32; 3], name: &str) -> Vec<u8> {
     let mut b = vec![0u8; 8];

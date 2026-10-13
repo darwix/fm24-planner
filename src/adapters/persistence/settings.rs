@@ -1,5 +1,4 @@
 use crate::{application::session::SettingsRepository, domain::entities::Settings, Error, Result};
-use serde_json::Value;
 use std::{fs, io::Write, path::PathBuf};
 
 /// Settings kept in `settings.json` inside the data directory.
@@ -22,17 +21,8 @@ impl SettingsRepository for JsonSettingsRepository {
         if path.exists() {
             return Ok(serde_json::from_slice(&fs::read(path)?)?);
         }
-        // Migrate the folder from the earlier desktop app's settings, if present.
-        let legacy = std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .map(|p| p.join("FM-SaveLens-24/settings.json"));
-        let folder = legacy
-            .and_then(|p| fs::read(p).ok())
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-            .and_then(|v| v["folder"].as_str().map(str::to_owned))
-            .unwrap_or_else(|| self.default_folder.clone());
         Ok(Settings {
-            folder,
+            folder: self.default_folder.clone(),
             last_snapshot: None,
             session: None,
         })

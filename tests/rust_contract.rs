@@ -1,6 +1,6 @@
 // Private reverse-engineering tests. Fixtures are the 800 bytes before a player's
 // person record in an FM24 save; expected values are what the game showed.
-use fm_savelens_backend::adapters::parser::records::contract::{find, value};
+use fm_squad_planner::adapters::parser::records::contract::{find, value};
 
 fn bytes(hex: &str) -> Vec<u8> {
     hex.split_whitespace()
@@ -145,7 +145,7 @@ fn duncliffe_wage_and_expiry() {
 // rows sit before the last 800 bytes, behind three zero-wage rows. Fixture is 3000 bytes.
 #[test]
 fn green_paid_rows_before_the_window() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/green.hex")), 515186);
     assert_eq!(c.wage, Some(25_541));
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
@@ -173,7 +173,7 @@ fn sari_zero_wage_contract_with_an_end() {
 // Miki (Newcastle, to 2057-06-30): his block sits before the last 800 bytes. Fixture: 3000 bytes.
 #[test]
 fn terms_block_before_the_window() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/terms_far.hex")), 584929);
     assert_eq!(c.wage, Some(32_819));
     assert_eq!(c.contract_end.as_deref(), Some("2057-06-30"));
@@ -183,7 +183,7 @@ fn terms_block_before_the_window() {
 // than the end, so it is not a start year.
 #[test]
 fn terms_block_with_a_later_year_field() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/terms_late_year.hex")), 246717);
     assert_eq!(c.wage, Some(5_797));
     assert_eq!(c.contract_end.as_deref(), Some("2053-12-31"));
@@ -193,7 +193,7 @@ fn terms_block_with_a_later_year_field() {
 // four blank-dated paid rows after it are other clubs' approaches, not his contract.
 #[test]
 fn blank_dated_approach_rows_are_skipped() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/approaches.hex")), 584177);
     assert_eq!(c.wage, Some(22_030));
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
@@ -203,7 +203,7 @@ fn blank_dated_approach_rows_are_skipped() {
 // the game shows; the FF-dated row after it (£42,217) and the approaches are not.
 #[test]
 fn wage_comes_from_the_first_row() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/first_row_wage.hex")), 288628);
     assert_eq!(c.wage, Some(46_908));
 }
@@ -212,7 +212,7 @@ fn wage_comes_from_the_first_row() {
 // behind approaches; the end is in the terms block before that row. Fixture: 4000 bytes.
 #[test]
 fn end_comes_from_the_block_before_the_first_row() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/sirera.hex")), 605300);
     assert_eq!(c.wage, Some(273));
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
@@ -222,7 +222,7 @@ fn end_comes_from_the_block_before_the_first_row() {
 // bits (EF 32), which must be masked like any day.
 #[test]
 fn start_day_after_the_end_is_masked() {
-    use fm_savelens_backend::adapters::parser::records::contract::find_wide;
+    use fm_squad_planner::adapters::parser::records::contract::find_wide;
     let c = find_wide(&bytes(include_str!("fixtures/breant.hex")), 603910);
     assert_eq!(c.contract_end.as_deref(), Some("2053-06-30"));
 }
@@ -233,7 +233,7 @@ fn start_day_after_the_end_is_masked() {
 // listed, Sirera neither.
 #[test]
 fn transfer_and_loan_listed() {
-    use fm_savelens_backend::adapters::parser::records::contract::listed;
+    use fm_squad_planner::adapters::parser::records::contract::listed;
     let breant = bytes(include_str!("fixtures/breant.hex"));
     let fiorucci = bytes(include_str!("fixtures/fiorucci.hex"));
     let sirera = bytes(include_str!("fixtures/sirera.hex"));
@@ -247,7 +247,7 @@ fn transfer_and_loan_listed() {
 // so his loan flag does not count.
 #[test]
 fn a_player_out_on_loan_is_not_loan_listed() {
-    use fm_savelens_backend::adapters::parser::records::contract::listed;
+    use fm_squad_planner::adapters::parser::records::contract::listed;
     let jose_alberto = bytes(include_str!("fixtures/jose_alberto.hex"));
     assert_eq!(listed(&jose_alberto, 478100), (false, false));
 }
@@ -256,7 +256,7 @@ fn a_player_out_on_loan_is_not_loan_listed() {
 // searches leave players out on loan out, so neither flag counts.
 #[test]
 fn a_player_out_on_loan_is_not_transfer_listed() {
-    use fm_savelens_backend::adapters::parser::records::contract::listed;
+    use fm_squad_planner::adapters::parser::records::contract::listed;
     let guimaraes = bytes(include_str!("fixtures/guimaraes.hex"));
     assert_eq!(listed(&guimaraes, 390394).0, false);
 }

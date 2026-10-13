@@ -1,7 +1,7 @@
 // private reverse-engineering helper: dump raw bytes around one player. read-only.
-use fm_savelens_backend::adapters::parser::{archive::Archive, records};
+use fm_squad_planner::adapters::parser::{archive::Archive, records};
 use std::path::Path;
-use fm_savelens_backend::utils::cancel::CancelFlag;
+use fm_squad_planner::utils::cancel::CancelFlag;
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let (path, id) = (&a[1], a[2].parse::<i64>().unwrap());

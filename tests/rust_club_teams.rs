@@ -1,6 +1,6 @@
 // A club record lists its teams after its names: [-1 or a club id][00 00 00][count][count team
 // numbers], the first team first (AS Vitré: 3148, 20055, 34615).
-use fm_savelens_backend::{
+use fm_squad_planner::{
     adapters::parser::records::{clubs::team_lists, teams::Team},
     domain::entities::Club,
 };
@@ -142,7 +142,7 @@ fn a_list_whose_first_team_names_the_club_wins() {
 // Team number to club: a club's own list beats the club a team record names.
 #[test]
 fn team_clubs_prefers_the_club_lists() {
-    use fm_savelens_backend::adapters::parser::records::teams::team_clubs;
+    use fm_squad_planner::adapters::parser::records::teams::team_clubs;
     let teams = [
         Team {
             club: Some(4198),

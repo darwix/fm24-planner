@@ -29,6 +29,10 @@ describe("buildSquad", () => {
     const [x] = buildSquad([pl("A", ["MC", "AMC", "AMR"], 150)]);
     expect(x.pos).toEqual(["MC", "AMC", "AMR"]);
   });
+  it("keeps the player's real club, so a planned signing can be told apart", () => {
+    const [x] = buildSquad([pl("A", ["ST"], 150)]);
+    expect(x.cl).toBe("Test FC");
+  });
   it("fills the AMC slot", () => {
     const s = buildSquad([pl("A", ["AMC"], 150)]);
     expect(s[0]).toMatchObject({ p: "AMC", xi: 1 });

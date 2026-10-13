@@ -138,3 +138,51 @@ async fn planner_state_is_kept_in_the_snapshot_across_restarts() {
     assert!(page["total"].as_u64().unwrap() > 0);
     server.shutdown().await.unwrap();
 }
+
+#[tokio::test]
+async fn shortlist_is_its_own_table_and_search_can_use_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let (server, url, id) = imported(dir.path()).await;
+    let client = reqwest::Client::new();
+    let list = format!("{url}/api/snapshots/{id}/shortlist");
+    let one = |p: u32| format!("{url}/api/snapshots/{id}/shortlist/{p}");
+    let search = |q: &str| format!("{url}/api/snapshots/{id}/players?{q}");
+
+    // the old planner `kept` copies become rows once, then the key is gone
+    ok(client
+        .put(format!("{url}/api/snapshots/{id}/planner/kept"))
+        .json(&json!({"value":[{"id":1,"n":"A"},{"id":2,"n":"B"}]}))
+        .send()
+        .await
+        .unwrap())
+    .await;
+    let got = ok(client.get(&list).send().await.unwrap()).await;
+    assert_eq!(got["ids"], json!([1, 2]));
+    let kept = ok(client
+        .get(format!("{url}/api/snapshots/{id}/planner/kept"))
+        .send()
+        .await
+        .unwrap())
+    .await;
+    assert_eq!(kept["value"], Value::Null);
+
+    ok(client.put(one(3)).send().await.unwrap()).await;
+    ok(client.put(one(3)).send().await.unwrap()).await; // adding twice is fine
+    ok(client.delete(one(1)).send().await.unwrap()).await;
+    let got = ok(client.get(&list).send().await.unwrap()).await;
+    assert_eq!(got["ids"], json!([2, 3]));
+
+    let page = ok(client.get(search("shortlist=1")).send().await.unwrap()).await;
+    assert_eq!(page["total"], 2);
+    let club = page["players"][0]["clubId"].clone();
+    if let Some(club) = club.as_i64() {
+        let page = ok(client
+            .get(search(&format!("shortlist=1&excludeClub={club}")))
+            .send()
+            .await
+            .unwrap())
+        .await;
+        assert!(page["total"].as_i64().unwrap() < 2);
+    }
+    server.shutdown().await.unwrap();
+}

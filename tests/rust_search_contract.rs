@@ -151,17 +151,6 @@ fn loan_listed_filter_leaves_out_the_managed_club() {
     assert_eq!(total("loanListed=1"), 1);
 }
 
-// The saved shortlist is a list of ids; the page filters and sorts them in SQL.
-#[test]
-fn only_these_ids() {
-    let dir = tempfile::tempdir().unwrap();
-    let db = snapshot(&dir);
-    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
-    assert_eq!(total("ids=1,2,3"), 3);
-    assert_eq!(total("ids=1,2,3&excludeIds=2"), 2);
-    assert_eq!(total("ids="), 64);
-    assert!(db.search("ids=1,x").is_err());
-}
 
 #[test]
 fn contract_end_max_can_keep_players_without_a_contract() {
@@ -193,16 +182,38 @@ fn sorts_by_value_wage_contract_and_position_with_unknowns_last() {
         )
         .unwrap();
     let first = |q: &str| -> Vec<i64> {
-        db.search(&format!("ids=1,2,3&{q}")).unwrap()["players"]
+        db.search(q).unwrap()["players"]
             .as_array()
             .unwrap()
             .iter()
+            .take(2)
             .map(|p| p["id"].as_i64().unwrap())
             .collect()
     };
-    assert_eq!(first("sort=value&direction=asc"), [2, 1, 3]);
-    assert_eq!(first("sort=value&direction=desc"), [1, 2, 3]);
-    assert_eq!(first("sort=wage&direction=asc"), [1, 2, 3]);
-    assert_eq!(first("sort=contractEnd&direction=asc"), [2, 1, 3]);
-    assert_eq!(first("sort=position&direction=asc")[..2], [2, 1]);
+    assert_eq!(first("sort=value&direction=asc"), [2, 1]);
+    assert_eq!(first("sort=value&direction=desc"), [1, 2]);
+    assert_eq!(first("sort=wage&direction=asc"), [1, 2]);
+    assert_eq!(first("sort=contractEnd&direction=asc"), [2, 1]);
+    assert_eq!(first("sort=position&direction=asc"), [2, 1]);
+}
+
+#[test]
+fn shortlist_search_is_empty_before_the_table_exists_and_club_can_be_excluded() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = snapshot(&dir);
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("shortlist=1"), 0);
+    rusqlite::Connection::open(&db.path)
+        .unwrap()
+        .execute_batch(
+            "CREATE TABLE shortlist (player_id INTEGER PRIMARY KEY);
+         INSERT INTO shortlist VALUES (1),(2),(3);
+         UPDATE players SET club_id=7 WHERE id=1;
+         UPDATE players SET club_id=NULL WHERE id=2;
+         UPDATE players SET club_id=8 WHERE id=3;",
+        )
+        .unwrap();
+    assert_eq!(total("shortlist=1"), 3);
+    // free agents are never at your club
+    assert_eq!(total("shortlist=1&excludeClub=7"), 2);
 }

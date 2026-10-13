@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SquadPlayer } from "@/models/player";
+import { api } from "@/services/api";
 import {
   applyArrangement,
   arrKey,
@@ -10,14 +11,18 @@ import {
   toArrangement,
 } from "./store";
 
-const mem = new Map<string, string>();
+let server: Record<string, unknown>;
 beforeEach(() => {
-  mem.clear();
-  vi.stubGlobal("localStorage", {
-    getItem: (k: string) => mem.get(k) ?? null,
-    setItem: (k: string, v: string) => void mem.set(k, v),
+  server = {};
+  vi.spyOn(api, "get").mockImplementation(async (url: string) => ({
+    data: { value: server[url] ?? null },
+  }));
+  vi.spyOn(api, "put").mockImplementation(async (url: string, body: any) => {
+    server[url] = body.value;
+    return { data: {} };
   });
 });
+afterEach(() => vi.restoreAllMocks());
 
 const club = { name: "Aston Villa", snapshotId: "abc", gameDate: "2053-03-01" };
 const pl = (id: number, extra: Partial<SquadPlayer> = {}): SquadPlayer => ({
@@ -67,33 +72,23 @@ describe("arrangement", () => {
 });
 
 describe("store", () => {
-  it("keys an arrangement by save and club", () => {
-    expect(arrKey(club)).toBe("fm:arr:abc:Aston Villa");
+  it("keys an arrangement by club inside the snapshot", () => {
+    expect(arrKey(club)).toBe("squad:Aston Villa");
   });
-  it("round-trips an arrangement", () => {
+  it("round-trips an arrangement through the snapshot's planner", async () => {
     const arr = { slots: [], vacant: [{ p: "ST", x: 1, y: 2 }] };
-    saveArr(club, arr);
-    expect(loadArr(club)).toEqual(arr);
+    await saveArr(club, arr);
+    expect(server["/api/snapshots/abc/planner/squad%3AAston%20Villa"]).toEqual(
+      arr,
+    );
+    expect(await loadArr(club)).toEqual(arr);
   });
-  it("round-trips the session", () => {
-    saveSession({ club, arr: { slots: [], vacant: [] } });
-    expect(loadSession()?.club).toEqual(club);
+  it("round-trips the session", async () => {
+    await saveSession({ club });
+    expect((await loadSession())?.club).toEqual(club);
   });
-  it("returns null when nothing is saved or the data is broken", () => {
-    expect(loadArr(club)).toBeNull();
-    mem.set(arrKey(club), "{oops");
-    expect(loadArr(club)).toBeNull();
-  });
-  it("does not throw when storage is blocked", () => {
-    vi.stubGlobal("localStorage", {
-      getItem: () => {
-        throw new Error("blocked");
-      },
-      setItem: () => {
-        throw new Error("blocked");
-      },
-    });
-    expect(loadSession()).toBeNull();
-    expect(() => saveArr(club, { slots: [], vacant: [] })).not.toThrow();
+  it("returns null when nothing is saved", async () => {
+    expect(await loadArr(club)).toBeNull();
+    expect(await loadSession()).toBeNull();
   });
 });

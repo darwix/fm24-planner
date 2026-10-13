@@ -51,7 +51,7 @@ fn main_position_is_the_best_rated_position() {
 }
 
 #[test]
-fn unknown_value_and_excluded_ids() {
+fn unknown_value() {
     let dir = tempfile::tempdir().unwrap();
     let db = snapshot(&dir);
     rusqlite::Connection::open(&db.path)
@@ -63,9 +63,6 @@ fn unknown_value_and_excluded_ids() {
     let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("valueMax=1000000"), 62);
     assert_eq!(total("valueMax=1000000&valueUnknown=1"), 64);
-    assert_eq!(total("excludeIds=1,2,3"), 61);
-    assert_eq!(total("excludeIds="), 64);
-    assert!(db.search("excludeIds=1,x").is_err());
 }
 
 #[test]

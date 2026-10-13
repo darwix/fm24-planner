@@ -113,7 +113,7 @@ export default function Upload() {
         squad.findIndex((s) => s.xi),
       ),
     );
-    setClub({ name: club.name, snapshotId: snap, gameDate });
+    setClub({ name: club.name, id: club.id, snapshotId: snap, gameDate });
     nav("/squad");
   };
 

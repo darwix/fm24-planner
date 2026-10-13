@@ -10,7 +10,6 @@ use std::collections::HashMap;
 /// JavaScript's largest exact integer, so any number the web app sends is accepted.
 const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 const MAX_TEXT_UNITS: usize = 200;
-const MAX_EXCLUDED: usize = 5000;
 const MAX_CLUB: i64 = 100_000;
 const MAX_NATION: i64 = 255;
 const MAX_PAGE: i64 = 100_000;
@@ -80,19 +79,6 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
     filter.value_max = integer("valueMax", 0, MAX_SAFE_INTEGER)?;
     filter.value_unknown = flag("valueUnknown");
     filter.main_positions = positions("mainPosition")?;
-    if let Some(list) = params.get("excludeIds").filter(|s| !s.is_empty()) {
-        filter.exclude_ids = list
-            .split(',')
-            .map(|id| {
-                id.trim()
-                    .parse::<u32>()
-                    .map_err(|_| Error::query("Invalid excludeIds."))
-            })
-            .collect::<Result<Vec<_>>>()?;
-        if filter.exclude_ids.len() > MAX_EXCLUDED {
-            return Err(Error::query("Too many excludeIds."));
-        }
-    }
     if let Some(date) = params.get("contractEndMax").filter(|s| !s.is_empty()) {
         if !is_iso_date(date) {
             return Err(Error::query("Invalid contractEndMax. Expected YYYY-MM-DD."));

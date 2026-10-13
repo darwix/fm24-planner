@@ -6,7 +6,13 @@ import {
   putSession,
 } from "@/services/planner";
 
-type Club = { name: string; snapshotId: string; gameDate: string };
+type Club = {
+  name: string;
+  // the save's club id; sessions from before it was stored have none
+  id?: number;
+  snapshotId: string;
+  gameDate: string;
+};
 type Vacant = { p: string; x: number; y: number };
 // who sits where; player data (contract, value, positions) is read fresh from the save
 export type Slot = Pick<SquadPlayer, "id" | "p" | "xi" | "x" | "y" | "cover">;

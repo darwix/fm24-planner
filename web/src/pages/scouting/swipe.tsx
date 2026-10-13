@@ -12,12 +12,10 @@ import {
 } from "@/services/save";
 import { money, wage } from "@/utils/format";
 import {
-  addPassed,
-  clearPassed,
-  loadPassed,
-  removePassed,
-} from "@/utils/passed";
-import { getPlanner, putPlanner } from "@/services/planner";
+  addShortlist,
+  getShortlist,
+  removeShortlist,
+} from "@/services/shortlist";
 import { scoutQuery, swipeBody, toPool } from "@/utils/player";
 
 const THRESH = 110;
@@ -167,7 +165,7 @@ export default function Swipe() {
   const page = useRef(0);
   const busy = useRef(false);
   const keptIds = useRef<number[]>([]);
-  keptIds.current = kept.map((k) => k.id);
+  keptIds.current = kept;
   const snap = club?.snapshotId;
   const f = (lists[li] ?? lists[0]).f;
 
@@ -175,13 +173,9 @@ export default function Swipe() {
     if (!club || busy.current) return;
     busy.current = true;
     try {
-      const passed = [
-        ...(await loadPassed(club.snapshotId)),
-        ...keptIds.current,
-      ];
       const r = await searchPage(
         club.snapshotId,
-        swipeBody(scoutQuery(f, club.gameDate), passed, page.current + 1),
+        swipeBody(scoutQuery(f, club.gameDate), page.current + 1),
       );
       page.current += 1;
       setTotal(r.total);
@@ -190,7 +184,8 @@ export default function Swipe() {
         return [
           ...s,
           ...r.players
-            .filter((q) => !have.has(q.id))
+            // already on the shortlist: skip; passed players come back next time
+            .filter((q) => !have.has(q.id) && !keptIds.current.includes(q.id))
             .map((q) => toPool(q, club.gameDate)),
         ];
       });
@@ -201,24 +196,18 @@ export default function Swipe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [club?.snapshotId]);
 
-  // kept players are stored in the snapshot: load once, then save every change
-  const keptReady = useRef(false);
+  // the shortlist table holds the ids; each swipe right adds one row
   useEffect(() => {
     if (!snap) return;
-    keptReady.current = false;
-    getPlanner<PoolPlayer[]>(snap, "kept")
-      .then((k) => {
-        setKept(k ?? []);
-        keptReady.current = true;
+    getShortlist(snap)
+      .then((ids) => {
+        setKept(ids);
+        keptIds.current = ids;
         more();
       })
       .catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snap]);
-  useEffect(() => {
-    if (snap && keptReady.current)
-      putPlanner(snap, "kept", kept).catch(console.error);
-  }, [snap, kept]);
   // top up before the stack runs dry
   useEffect(() => {
     if (loaded && total !== undefined && stack.length - i <= 5) {
@@ -245,8 +234,10 @@ export default function Swipe() {
   const commit = (dir: number) => {
     if (!top) return;
     setHist((h) => [...h, { p: top, dir }]);
-    if (dir > 0) setKept((k) => [...k, top]);
-    else addPassed(snap, top.id).catch(console.error);
+    if (dir > 0) {
+      setKept((k) => [...k, top.id]);
+      addShortlist(snap, top.id).catch(console.error);
+    }
     setI(i + 1);
     setOut(0);
     setDx(null);
@@ -266,8 +257,10 @@ export default function Swipe() {
     const h = hist[hist.length - 1];
     if (!h) return;
     setHist(hist.slice(0, -1));
-    if (h.dir > 0) setKept((k) => k.filter((q) => q.id !== h.p.id));
-    else removePassed(snap, h.p.id).catch(console.error);
+    if (h.dir > 0) {
+      setKept((k) => k.filter((id) => id !== h.p.id));
+      removeShortlist(snap, h.p.id).catch(console.error);
+    }
     setI(i - 1);
   };
   keys.current = {
@@ -315,19 +308,6 @@ export default function Swipe() {
         </span>
         <button className="btn" onClick={() => nav("/shortlist")}>
           Shortlist ({kept.length})
-        </button>
-        <button
-          className="btn"
-          onClick={() => {
-            setStack([]);
-            setHist([]);
-            setI(0);
-            page.current = 0;
-            setLoaded(false);
-            clearPassed(snap).then(more, console.error);
-          }}
-        >
-          Reset passed
         </button>
       </div>
       <div
@@ -405,11 +385,13 @@ export default function Swipe() {
           {top && left !== undefined ? `${left.toLocaleString()} left` : ""}
         </div>
         <div className="picked">
-          {kept.map((p) => (
-            <span key={p.id} onClick={() => nav(`/player/${p.id}`)}>
-              {p.n}
-            </span>
-          ))}
+          {hist
+            .filter((h) => h.dir > 0)
+            .map(({ p }) => (
+              <span key={p.id} onClick={() => nav(`/player/${p.id}`)}>
+                {p.n}
+              </span>
+            ))}
         </div>
       </div>
     </section>

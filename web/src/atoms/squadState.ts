@@ -12,6 +12,7 @@ export const vacantState = atom<{ p: string; x: number; y: number }[]>({
 });
 export const clubState = atom<{
   name: string;
+  id?: number;
   snapshotId: string;
   gameDate: string;
 } | null>({

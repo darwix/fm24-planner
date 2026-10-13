@@ -15,12 +15,11 @@ import {
   type PoolPlayer,
   type Tag,
 } from "@/models/player";
-import { getPlanner } from "@/services/planner";
 import { useSearch } from "@/services/save";
+import { getShortlist } from "@/services/shortlist";
 import { money, wage } from "@/utils/format";
 import { asCandidate, contractLabel, inGroup } from "@/utils/logic";
 import { POS_INDEX, toPool } from "@/utils/player";
-import { canPlay } from "@/utils/shortlist";
 
 export default function Shortlist() {
   const nav = useNavigate();
@@ -31,13 +30,11 @@ export default function Shortlist() {
   const [vacant, setVacant] = useRecoilState(vacantState);
   const sel = useRecoilValue(selectedState);
   const [on, setOn] = useState<Tag[]>(["exp", "cheap", "tl"]);
-  // outside the club only your shortlist (players kept while scouting) is offered
-  const [kept, setKept] = useState<PoolPlayer[]>([]);
+  // reading the list first moves an old snapshot's saved list into the table
+  const [ready, setReady] = useState(false);
   useEffect(() => {
     if (club)
-      getPlanner<PoolPlayer[]>(club.snapshotId, "kept")
-        .then((k) => setKept(k ?? []))
-        .catch(console.error);
+      getShortlist(club.snapshotId).then(() => setReady(true), console.error);
   }, [club]);
   const t = squad[sel] ?? squad[0];
   const pos = addPos ?? t?.p;
@@ -45,19 +42,19 @@ export default function Shortlist() {
   const ref = addPos
     ? Math.round(squad.reduce((n, s) => n + s.ca, 0) / (squad.length || 1)) - 10
     : t?.ca;
-  const found = useSearch(
+  // everyone at your club who can play here, and your shortlist outside the club
+  const near = (q: object) =>
+    ready && pos && club?.id !== undefined
+      ? { position: POS_INDEX[pos], sort: "ca", limit: 250, ...q }
+      : null;
+  const atClub = useSearch(club?.snapshotId, near({ club: club?.id }));
+  const shortlisted = useSearch(
     club?.snapshotId,
-    pos && ref !== undefined
-      ? {
-          position: POS_INDEX[pos],
-          caMin: Math.max(1, ref - 10),
-          caMax: ref + 30,
-          sort: "ca",
-          limit: 250,
-        }
-      : null,
+    near({ shortlist: 1, excludeClub: club?.id }),
   );
-  if (!squad.length || !club) return <Navigate to="/upload" replace />;
+  if (!squad.length || !club || club.id === undefined)
+    return <Navigate to="/upload" replace />;
+  const found = atClub && shortlisted;
 
   const K = addPos ? [] : Object.keys(t.at);
   // cover at the same position already in the squad plan, ready to step into the XI
@@ -87,22 +84,21 @@ export default function Shortlist() {
   const mine = (s: { cl?: string }) => s.cl === undefined || s.cl === club.name;
   const own = able.filter(({ i }) => mine(squad[i]));
   const signed = able.filter(({ i }) => !mine(squad[i])).map(({ c }) => c);
-  const searched = (found ?? []).map((p) => toPool(p, club.gameDate));
   const fresh = (p: PoolPlayer) =>
     p.id !== (addPos ? undefined : t.id) && !own.some(({ c }) => c.id === p.id);
   // the rest of your club: players outside the planner squad, and (when replacing)
   // squad players of other groups; adding cover skips those already in the group
-  const clubList: Candidate[] = searched
-    .filter((p) => p.cl === club.name && fresh(p))
+  const clubList: Candidate[] = (atClub ?? [])
+    .map((p) => toPool(p, club.gameDate))
+    .filter(fresh)
     .filter(
       (p) => !addPos || !squad.some((s) => s.id === p.id && inGroup(s, addPos)),
     )
     .map((p) => asCandidate({ ...p, p: pos }, ref))
     .sort((a, b) => b.m - a.m);
-  const list: Candidate[] = kept
-    .filter((k) => canPlay(k, pos!))
-    .filter((p) => p.cl !== club.name && fresh(p))
-    .filter((p) => !squad.some((s) => s.id === p.id))
+  const list: Candidate[] = (shortlisted ?? [])
+    .map((p) => toPool(p, club.gameDate))
+    .filter((p) => fresh(p) && !squad.some((s) => s.id === p.id))
     .map((p) => asCandidate({ ...p, p: pos }, ref))
     // chips hide tagged players whose tags are all off; untagged kept players stay
     .filter((c) => !c.tags.length || c.tags.some((g) => on.includes(g)))
@@ -304,7 +300,7 @@ export default function Shortlist() {
         {list.map(pick)}
         {found && !list.length && (
           <div className="sub">
-            {kept.some((k) => canPlay(k, pos!))
+            {shortlisted?.length
               ? "No matches. Turn a filter back on."
               : `Nobody on your shortlist plays ${pos}. Scout for one.`}
           </div>

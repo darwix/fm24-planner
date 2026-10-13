@@ -15,7 +15,7 @@ export const monthsLeft = (
 // index of each UI position in the backend's catalog (GET /api/attributes -> positions)
 // last contract-end date that still counts as expiring (<= `months` left)
 // ponytail: month-end game dates (e.g. 31 Jan) can overshoot by a day or two
-const expiryCutoff = (now: string, months: number) => {
+export const expiryCutoff = (now: string, months: number) => {
   const [y, m, d] = now.split("-").map(Number);
   return new Date(Date.UTC(y, m + months, d - 1)).toISOString().slice(0, 10);
 };
@@ -75,14 +75,12 @@ export const toPool = (p: ApiPlayer, gameDate: string): PoolPlayer => ({
 
 export const SWIPE_PAGE = 50;
 
-// POST body for one page of the swipe stack: the same filters, minus passed players
+// POST body for one page of the swipe stack
 export const swipeBody = (
   query: ReturnType<typeof scoutQuery>,
-  passed: number[],
   page: number,
 ) => ({
   ...query,
   limit: SWIPE_PAGE,
   page,
-  ...(passed.length && { excludeIds: passed }),
 });

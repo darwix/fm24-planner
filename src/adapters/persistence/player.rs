@@ -86,10 +86,6 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         "main_position IN",
         filter.main_positions.iter().map(|&i| i as i64).collect(),
     );
-    in_list(
-        "id NOT IN",
-        filter.exclude_ids.iter().map(|&id| id as i64).collect(),
-    );
     if let Some(date) = &filter.contract_end_max {
         clauses.push(
             if filter.or_no_contract {

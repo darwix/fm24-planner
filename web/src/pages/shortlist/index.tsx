@@ -1,16 +1,18 @@
 import "./shortlist.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { mutate } from "swr";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
-import { keptState } from "@/atoms/scoutState";
 import { clubState, squadState } from "@/atoms/squadState";
 import type { PoolPlayer } from "@/models/player";
-import { getPlanner, putPlanner } from "@/services/planner";
+import { useSearchResult } from "@/services/save";
+import { getShortlist, removeShortlist } from "@/services/shortlist";
 import { money, wage } from "@/utils/format";
+import { POS_INDEX, toPool } from "@/utils/player";
 import {
   type ShortlistFilter,
   type SortKey,
-  shortlistView,
+  shortlistQuery,
   stars,
 } from "@/utils/shortlist";
 
@@ -53,7 +55,6 @@ function Stars({ ca, pa }: { ca: number; pa: number }) {
 export default function Shortlist() {
   const nav = useNavigate();
   const club = useRecoilValue(clubState);
-  const [kept, setKept] = useRecoilState(keptState);
   const [squad, setSquad] = useRecoilState(squadState);
   const [f, setF] = useState<ShortlistFilter>({
     pos: [],
@@ -66,31 +67,29 @@ export default function Shortlist() {
     dir: 1,
   });
   const snap = club?.snapshotId;
-  // same planner key as the swipe page: load once, then save every change
-  const ready = useRef(false);
+  // reading the list first moves an old snapshot's saved list into the table
+  const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (!snap) return;
-    ready.current = false;
-    getPlanner<PoolPlayer[]>(snap, "kept")
-      .then((k) => {
-        setKept(k ?? []);
-        ready.current = true;
-      })
-      .catch(console.error);
-  }, [snap, setKept]);
-  useEffect(() => {
-    if (snap && ready.current)
-      putPlanner(snap, "kept", kept).catch(console.error);
-  }, [snap, kept]);
-  if (!club) return <Navigate to="/upload" replace />;
-
-  const positions = [...new Set(kept.map((p) => p.p))];
-  // a picked position whose last player was dropped has no chip left to untick
-  const rows = shortlistView(
-    kept,
-    { ...f, pos: f.pos.filter((x) => positions.includes(x)) },
-    sort,
+    if (snap) getShortlist(snap).then(() => setReady(true), console.error);
+  }, [snap]);
+  const base =
+    ready && club?.id !== undefined
+      ? { shortlist: 1, excludeClub: club.id, limit: 250 }
+      : null;
+  const all = useSearchResult(snap, base);
+  // a picked position nobody left on the list can play has no chip to untick
+  const everyone = (all?.players ?? []).map((p) => toPool(p, club!.gameDate));
+  const positions = Object.keys(POS_INDEX).filter((x) =>
+    everyone.some((p) => p.pos?.includes(x)),
   );
+  const pos = f.pos.filter((x) => positions.includes(x));
+  const found = useSearchResult(
+    snap,
+    base && shortlistQuery({ ...f, pos }, sort, club!.gameDate, club!.id!),
+  );
+  if (!club || club.id === undefined) return <Navigate to="/upload" replace />;
+
+  const rows = (found?.players ?? []).map((p) => toPool(p, club.gameDate));
   const inSquad = new Set(squad.map((s) => s.id));
   const addToSquad = (p: PoolPlayer) =>
     setSquad([
@@ -110,6 +109,11 @@ export default function Shortlist() {
         at: {},
       },
     ]);
+  const drop = async (p: PoolPlayer) => {
+    await removeShortlist(club.snapshotId, p.id);
+    // refetch every shortlist search on this page
+    mutate((k) => Array.isArray(k) && k[1]?.shortlist === 1);
+  };
   const togglePos = (x: string) =>
     setF({
       ...f,
@@ -121,8 +125,8 @@ export default function Shortlist() {
       <div className="sum">
         <h2>Shortlist</h2>
         <span>
-          {rows.length} of {kept.length} signed ·{" "}
-          {kept.filter((p) => p.left !== undefined && p.left <= 12).length}{" "}
+          {rows.length} of {everyone.length} signed ·{" "}
+          {everyone.filter((p) => p.left !== undefined && p.left <= 12).length}{" "}
           expiring within 12 months
         </span>
       </div>
@@ -199,7 +203,7 @@ export default function Shortlist() {
               )}
               <button
                 className="btn del"
-                onClick={() => setKept(kept.filter((k) => k.id !== p.id))}
+                onClick={() => drop(p).catch(console.error)}
               >
                 Drop
               </button>
@@ -208,9 +212,11 @@ export default function Shortlist() {
         ))}
         {!rows.length && (
           <div className="empty">
-            {kept.length
-              ? "No players match these filters."
-              : "Nothing on the shortlist. Swipe right on a card to add players."}
+            {!found
+              ? "Loading…"
+              : everyone.length
+                ? "No players match these filters."
+                : "Nothing on the shortlist. Swipe right on a card to add players."}
           </div>
         )}
       </div>

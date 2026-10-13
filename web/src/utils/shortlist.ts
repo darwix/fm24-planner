@@ -1,13 +1,10 @@
-import type { PoolPlayer } from "@/models/player";
+import { POS_INDEX, expiryCutoff } from "./player";
 
 // half stars like the game; ponytail: fixed scale (200 = 5), the game rates against your squad
 export const stars = (ca: number, pa: number) => ({
   ca: Math.round(ca / 20) / 2,
   pa: Math.round(pa / 20) / 2,
 });
-
-export const canPlay = (p: PoolPlayer, pos: string) =>
-  (p.pos ?? [p.p]).includes(pos);
 
 export type SortKey = "n" | "p" | "ca" | "v" | "left" | "w";
 export interface ShortlistFilter {
@@ -17,24 +14,35 @@ export interface ShortlistFilter {
   exp: boolean;
 }
 
-// filtered and sorted copy; a missing value (unknown price, no contract data) always sorts last
-export const shortlistView = (
-  list: PoolPlayer[],
+const SORT: Record<SortKey, string> = {
+  n: "name",
+  p: "position",
+  ca: "ca",
+  v: "value",
+  left: "contractEnd",
+  w: "wage",
+};
+
+// search params for the shortlist page: the backend filters and sorts (unknowns last)
+export const shortlistQuery = (
   f: ShortlistFilter,
   s: { k: SortKey; dir: 1 | -1 },
-) =>
-  list
-    .filter(
-      (p) =>
-        (!f.pos.length || f.pos.includes(p.p)) &&
-        (!f.tl || p.tl) &&
-        (!f.ll || p.ll) &&
-        (!f.exp || (p.left !== undefined && p.left <= 12)),
-    )
-    .sort((a, b) => {
-      const x = a[s.k],
-        y = b[s.k];
-      if (x === undefined || y === undefined)
-        return (x === undefined ? 1 : 0) - (y === undefined ? 1 : 0);
-      return s.dir * (x > y ? 1 : x < y ? -1 : 0);
-    });
+  gameDate: string,
+  clubId: number,
+) => ({
+  shortlist: 1,
+  excludeClub: clubId,
+  ...(f.pos.length && {
+    position: f.pos.map((x) => POS_INDEX[x]).join(","),
+    positionMatch: "or",
+  }),
+  ...(f.tl && { transferListed: 1 }),
+  ...(f.ll && { loanListed: 1 }),
+  ...(f.exp && {
+    contractEndMax: expiryCutoff(gameDate, 12),
+    orNoContract: 1,
+  }),
+  sort: SORT[s.k],
+  direction: s.dir === 1 ? "asc" : "desc",
+  limit: 250,
+});

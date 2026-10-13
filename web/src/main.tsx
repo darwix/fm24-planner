@@ -17,7 +17,8 @@ async function start() {
   try {
     session = await loadSession();
     const arr = session && (await loadArr(session.club));
-    if (session && arr)
+    // an old session without the club id: pick the club again on the upload page
+    if (session && session.club.id !== undefined && arr)
       saved = await loadSquad(
         session.club.snapshotId,
         session.club.gameDate,

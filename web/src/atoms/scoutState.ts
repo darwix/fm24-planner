@@ -21,8 +21,8 @@ export const listIndexState = atom<number>({
   default: 0,
 });
 
-// players swiped right on, waiting for review
-export const keptState = atom<PoolPlayer[]>({
+// ids on the shortlist (swiped right on)
+export const keptState = atom<number[]>({
   key: "keptState",
   default: [],
 });

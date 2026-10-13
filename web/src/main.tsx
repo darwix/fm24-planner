@@ -5,7 +5,7 @@ import { RecoilRoot } from "recoil";
 import { SWRConfig } from "swr";
 import { clubState, squadState, vacantState } from "./atoms/squadState";
 import { loadSquad } from "./services/save";
-import { loadSession } from "./utils/store";
+import { loadArr, loadSession } from "./utils/store";
 import Routes from "./routes";
 import "./index.css";
 import { apiFetcher } from "./services/api";
@@ -13,17 +13,18 @@ import { apiFetcher } from "./services/api";
 async function start() {
   // restore the last squad on fresh player data from the save
   let saved: Awaited<ReturnType<typeof loadSquad>> | null = null;
-  const session = loadSession();
-  if (session) {
-    try {
+  let session: Awaited<ReturnType<typeof loadSession>> = null;
+  try {
+    session = await loadSession();
+    const arr = session && (await loadArr(session.club));
+    if (session && arr)
       saved = await loadSquad(
         session.club.snapshotId,
         session.club.gameDate,
-        session.arr,
+        arr,
       );
-    } catch {
-      saved = null;
-    }
+  } catch {
+    saved = null;
   }
   ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

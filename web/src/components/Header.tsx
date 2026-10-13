@@ -13,10 +13,11 @@ export default function Header() {
   // keep the arrangement so a reload or a later "Open squad" restores it
   useEffect(() => {
     if (!club || !squad.length) return;
-    const arr = toArrangement(squad, vacant);
-    saveSession({ club, arr });
-    saveArr(club, arr);
+    saveArr(club, toArrangement(squad, vacant)).catch(console.error);
   }, [club, squad, vacant]);
+  useEffect(() => {
+    if (club) saveSession({ club }).catch(console.error);
+  }, [club]);
   const nav = useNavigate();
   const { pathname } = useLocation();
   return (

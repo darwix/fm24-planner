@@ -1,4 +1,4 @@
-use super::{imports, players, saves, system};
+use super::{imports, planner, players, saves, system};
 use crate::adapters::http::app_state::Shared;
 use axum::Router;
 
@@ -8,4 +8,5 @@ pub fn router() -> Router<Shared> {
         .merge(saves::routes())
         .merge(imports::routes())
         .merge(players::routes())
+        .merge(planner::routes())
 }

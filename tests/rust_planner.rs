@@ -121,7 +121,12 @@ async fn planner_state_is_kept_in_the_snapshot_across_restarts() {
     assert_eq!(got["value"], squad);
     let got = ok(client.get(planner("passed")).send().await.unwrap()).await;
     assert_eq!(got["value"], json!([2]));
-    let session = ok(client.get(format!("{url}/api/session")).send().await.unwrap()).await;
+    let session = ok(client
+        .get(format!("{url}/api/session"))
+        .send()
+        .await
+        .unwrap())
+    .await;
     assert_eq!(session["value"]["club"], "Arsenal");
     // players still searchable after the snapshot file was written to
     let page = ok(client

@@ -197,6 +197,7 @@ pub fn save_use_case(
             Ok(Settings {
                 folder: String::new(),
                 last_snapshot: None,
+                session: None,
             })
         }
         fn save(&self, _: &Settings) -> fm_savelens_backend::Result<()> {

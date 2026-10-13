@@ -17,6 +17,7 @@ import {
   loadPassed,
   removePassed,
 } from "@/utils/passed";
+import { getPlanner, putPlanner } from "@/services/planner";
 import { scoutQuery, swipeBody, toPool } from "@/utils/player";
 
 const THRESH = 110;
@@ -174,7 +175,10 @@ export default function Swipe() {
     if (!club || busy.current) return;
     busy.current = true;
     try {
-      const passed = [...loadPassed(club.snapshotId), ...keptIds.current];
+      const passed = [
+        ...(await loadPassed(club.snapshotId)),
+        ...keptIds.current,
+      ];
       const r = await searchPage(
         club.snapshotId,
         swipeBody(scoutQuery(f, club.gameDate), passed, page.current + 1),
@@ -197,9 +201,24 @@ export default function Swipe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [club?.snapshotId]);
 
+  // kept players are stored in the snapshot: load once, then save every change
+  const keptReady = useRef(false);
   useEffect(() => {
-    more();
-  }, [more]);
+    if (!snap) return;
+    keptReady.current = false;
+    getPlanner<PoolPlayer[]>(snap, "kept")
+      .then((k) => {
+        setKept(k ?? []);
+        keptReady.current = true;
+        more();
+      })
+      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snap]);
+  useEffect(() => {
+    if (snap && keptReady.current)
+      putPlanner(snap, "kept", kept).catch(console.error);
+  }, [snap, kept]);
   // top up before the stack runs dry
   useEffect(() => {
     if (loaded && total !== undefined && stack.length - i <= 5) {
@@ -227,7 +246,7 @@ export default function Swipe() {
     if (!top) return;
     setHist((h) => [...h, { p: top, dir }]);
     if (dir > 0) setKept((k) => [...k, top]);
-    else addPassed(snap, top.id);
+    else addPassed(snap, top.id).catch(console.error);
     setI(i + 1);
     setOut(0);
     setDx(null);
@@ -248,7 +267,7 @@ export default function Swipe() {
     if (!h) return;
     setHist(hist.slice(0, -1));
     if (h.dir > 0) setKept((k) => k.filter((q) => q.id !== h.p.id));
-    else removePassed(snap, h.p.id);
+    else removePassed(snap, h.p.id).catch(console.error);
     setI(i - 1);
   };
   keys.current = {
@@ -297,13 +316,12 @@ export default function Swipe() {
         <button
           className="btn"
           onClick={() => {
-            clearPassed(snap);
             setStack([]);
             setHist([]);
             setI(0);
             page.current = 0;
             setLoaded(false);
-            more();
+            clearPassed(snap).then(more, console.error);
           }}
         >
           Reset passed

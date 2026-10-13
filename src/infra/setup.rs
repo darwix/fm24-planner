@@ -3,12 +3,13 @@ use crate::{
         http::app_state::{AppState, Shared},
         parser::reader::FmSaveReader,
         persistence::{
-            FsSaveFiles, JsonSettingsRepository, SqlitePlayerRepository, SqliteSnapshotRepository,
+            FsSaveFiles, JsonSettingsRepository, SqlitePlannerRepository, SqlitePlayerRepository,
+            SqliteSnapshotRepository,
         },
     },
     application::{
         session::Session,
-        use_cases::{PlayerUseCase, SaveUseCase, SettingsUseCase},
+        use_cases::{PlannerUseCase, PlayerUseCase, SaveUseCase, SettingsUseCase},
     },
     infra::{config::default_folder, data_dir::DataDir},
     Result,
@@ -32,6 +33,9 @@ pub fn init_app_state(data: &Path) -> Result<(Shared, DataDir)> {
             Arc::new(SqliteSnapshotRepository::new(data.snapshots())),
         )),
         Arc::new(PlayerUseCase::new(Arc::new(SqlitePlayerRepository::new(
+            data.snapshots(),
+        )))),
+        Arc::new(PlannerUseCase::new(Arc::new(SqlitePlannerRepository::new(
             data.snapshots(),
         )))),
         Arc::new(SettingsUseCase::new(session, files)),

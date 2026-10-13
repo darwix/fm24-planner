@@ -87,9 +87,13 @@ export default function Upload() {
       setBusy(false);
       return setErr(e.message);
     }
-    const saved = loadArr({ name: club.name, snapshotId: snap, gameDate });
     let kept;
     try {
+      const saved = await loadArr({
+        name: club.name,
+        snapshotId: snap,
+        gameDate,
+      });
       kept = saved?.slots && (await loadSquad(snap, gameDate, saved));
     } catch (e: any) {
       // keep the saved arrangement instead of replacing it with a fresh squad

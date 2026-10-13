@@ -3,6 +3,7 @@ use crate::{
     domain::entities::{Job, Settings},
     Error, Result,
 };
+use serde_json::Value;
 use std::sync::Arc;
 
 pub struct SettingsUseCase {
@@ -36,9 +37,22 @@ impl SettingsUseCase {
         let settings = Settings {
             folder: self.files.directory(folder)?,
             last_snapshot: None,
+            session: inner.settings.session.clone(),
         };
         self.session.persist(&settings)?;
         inner.settings = settings.clone();
         Ok(settings)
+    }
+    /// Which snapshot and club the web app has open, kept with the settings.
+    pub fn session(&self) -> Option<Value> {
+        self.session.inner.lock().unwrap().settings.session.clone()
+    }
+    pub fn set_session(&self, value: Value) -> Result<()> {
+        let mut inner = self.session.inner.lock().unwrap();
+        let mut settings = inner.settings.clone();
+        settings.session = Some(value);
+        self.session.persist(&settings)?;
+        inner.settings = settings;
+        Ok(())
     }
 }

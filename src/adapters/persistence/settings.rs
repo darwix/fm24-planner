@@ -34,6 +34,7 @@ impl SettingsRepository for JsonSettingsRepository {
         Ok(Settings {
             folder,
             last_snapshot: None,
+            session: None,
         })
     }
     fn save(&self, settings: &Settings) -> Result<()> {

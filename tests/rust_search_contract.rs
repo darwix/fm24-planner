@@ -150,3 +150,59 @@ fn loan_listed_filter_leaves_out_the_managed_club() {
     let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
     assert_eq!(total("loanListed=1"), 1);
 }
+
+// The saved shortlist is a list of ids; the page filters and sorts them in SQL.
+#[test]
+fn only_these_ids() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = snapshot(&dir);
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("ids=1,2,3"), 3);
+    assert_eq!(total("ids=1,2,3&excludeIds=2"), 2);
+    assert_eq!(total("ids="), 64);
+    assert!(db.search("ids=1,x").is_err());
+}
+
+#[test]
+fn contract_end_max_can_keep_players_without_a_contract() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = snapshot(&dir);
+    rusqlite::Connection::open(&db.path)
+        .unwrap()
+        .execute_batch(
+            "UPDATE players SET contract_end='2060-06-30', wage=1000;
+         UPDATE players SET contract_end='2053-06-30' WHERE id=1;
+         UPDATE players SET contract_end=NULL, wage=NULL WHERE id=2;",
+        )
+        .unwrap();
+    let total = |q: &str| db.search(q).unwrap()["total"].as_i64().unwrap();
+    assert_eq!(total("contractEndMax=2053-06-30"), 1);
+    assert_eq!(total("contractEndMax=2053-06-30&orNoContract=1"), 2);
+}
+
+#[test]
+fn sorts_by_value_wage_contract_and_position_with_unknowns_last() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = snapshot(&dir);
+    rusqlite::Connection::open(&db.path)
+        .unwrap()
+        .execute_batch(
+            "UPDATE players SET value=NULL, wage=NULL, contract_end=NULL;
+         UPDATE players SET value=3000000, wage=900, contract_end='2055-06-30', main_position=3 WHERE id=1;
+         UPDATE players SET value=1000000, wage=2000, contract_end='2054-06-30', main_position=0 WHERE id=2;",
+        )
+        .unwrap();
+    let first = |q: &str| -> Vec<i64> {
+        db.search(&format!("ids=1,2,3&{q}")).unwrap()["players"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["id"].as_i64().unwrap())
+            .collect()
+    };
+    assert_eq!(first("sort=value&direction=asc"), [2, 1, 3]);
+    assert_eq!(first("sort=value&direction=desc"), [1, 2, 3]);
+    assert_eq!(first("sort=wage&direction=asc"), [1, 2, 3]);
+    assert_eq!(first("sort=contractEnd&direction=asc"), [2, 1, 3]);
+    assert_eq!(first("sort=position&direction=asc")[..2], [2, 1]);
+}

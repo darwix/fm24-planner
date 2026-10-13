@@ -25,7 +25,12 @@ export default function Header() {
       <h1>{club?.name ?? "Squad planner"}</h1>
       <span>FM24 save</span>
       <nav>
-        <NavLink to="/squad" className={tab}>
+        <NavLink
+          to="/squad"
+          className={({ isActive }) =>
+            isActive || pathname.startsWith("/candidates") ? "on" : ""
+          }
+        >
           Squad
         </NavLink>
         <NavLink to="/shortlist" className={tab}>

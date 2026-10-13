@@ -73,7 +73,7 @@ export default function Squad() {
           pos={pos}
           onSelect={setSel}
           onDetails={(i) => nav(`/player/${squad[i].id}`)}
-          onReplace={() => nav("/shortlist")}
+          onReplace={() => nav("/candidates")}
           onRemove={() => {
             const r = squad[sel];
             const rest = squad.filter((_, i) => i !== sel);
@@ -92,7 +92,7 @@ export default function Squad() {
             setSquad(rest);
             setSel(-1);
           }}
-          onAddCover={(p) => nav(`/shortlist?pos=${p}`)}
+          onAddCover={(p) => nav(`/candidates?pos=${p}`)}
           onClose={() => setOpen(false)}
         />
       )}

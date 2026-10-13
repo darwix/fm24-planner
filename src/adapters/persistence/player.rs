@@ -91,7 +91,14 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         filter.exclude_ids.iter().map(|&id| id as i64).collect(),
     );
     if let Some(date) = &filter.contract_end_max {
-        clauses.push("contract_end <= ?".into());
+        clauses.push(
+            if filter.or_no_contract {
+                "(contract_end <= ? OR (contract_end IS NULL AND wage IS NULL))"
+            } else {
+                "contract_end <= ?"
+            }
+            .into(),
+        );
         args.push(date.clone().into());
     }
     if filter.transfer_listed {
@@ -100,6 +107,26 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
     if filter.loan_listed {
         // like the game's search, leave out the managed club's own players
         clauses.push("loan_listed = 1 AND coalesce(club_id, -1) != coalesce((SELECT json_extract(value, '$.managedClubId') FROM metadata WHERE key = 'snapshot'), -2)".into());
+    }
+    if filter.shortlist {
+        // the table is created on first shortlist use; before that nobody is on it
+        let exists: bool = db.query_row(
+            "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type='table' AND name='shortlist')",
+            [],
+            |r| r.get(0),
+        )?;
+        clauses.push(
+            if exists {
+                "id IN (SELECT player_id FROM shortlist)"
+            } else {
+                "0"
+            }
+            .into(),
+        );
+    }
+    if let Some(club) = filter.exclude_club {
+        clauses.push("coalesce(club_id, -1) != ?".into());
+        args.push((club as i64).into());
     }
     if filter.no_contract {
         // a wage without a decoded end date is still a contract
@@ -136,6 +163,10 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         SortKey::Age => "age".to_owned(),
         SortKey::Ca => "ca".to_owned(),
         SortKey::Pa => "pa".to_owned(),
+        SortKey::Position => "main_position".to_owned(),
+        SortKey::Value => "value".to_owned(),
+        SortKey::Wage => "wage".to_owned(),
+        SortKey::ContractEnd => "contract_end".to_owned(),
         SortKey::Attribute(key) => format!("attr_{key}"),
     };
     let direction = if filter.descending { "desc" } else { "asc" };
@@ -153,7 +184,7 @@ fn search(db: &Connection, filter: &PlayerFilter) -> Result<PlayerPage> {
         filter.limit.into(),
         ((filter.page - 1) * filter.limit).into(),
     ]);
-    let mut stmt = db.prepare(&format!("SELECT id,uid,name,age,club_id,club,nationalities,positions,ca,pa,wage,contract_end,value,transfer_listed,loan_listed FROM players {condition} ORDER BY {column} {direction}, ca DESC, id ASC LIMIT ? OFFSET ?"))?;
+    let mut stmt = db.prepare(&format!("SELECT id,uid,name,age,club_id,club,nationalities,positions,ca,pa,wage,contract_end,value,transfer_listed,loan_listed FROM players {condition} ORDER BY {column} IS NULL, {column} {direction}, ca DESC, id ASC LIMIT ? OFFSET ?"))?;
     let players = stmt
         .query_map(params_from_iter(&args), |r| {
             let nationalities: String = r.get(6)?;

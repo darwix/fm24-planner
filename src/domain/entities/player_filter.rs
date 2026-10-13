@@ -23,6 +23,10 @@ pub enum SortKey {
     Age,
     Ca,
     Pa,
+    Position,
+    Value,
+    Wage,
+    ContractEnd,
     Attribute(String),
 }
 
@@ -38,8 +42,13 @@ pub struct PlayerFilter {
     pub value_unknown: bool,
     pub main_positions: Vec<usize>,
     pub exclude_ids: Vec<u32>,
-    /// ISO date; players with no contract never match.
+    /// ISO date; players with no contract match only with `or_no_contract`.
     pub contract_end_max: Option<String>,
+    pub or_no_contract: bool,
+    /// Only players on the snapshot's shortlist.
+    pub shortlist: bool,
+    /// Leave out this club's players (free agents always stay).
+    pub exclude_club: Option<u32>,
     pub no_contract: bool,
     pub transfer_listed: bool,
     pub loan_listed: bool,
@@ -65,6 +74,9 @@ impl Default for PlayerFilter {
             main_positions: vec![],
             exclude_ids: vec![],
             contract_end_max: None,
+            or_no_contract: false,
+            shortlist: false,
+            exclude_club: None,
             no_contract: false,
             transfer_listed: false,
             loan_listed: false,

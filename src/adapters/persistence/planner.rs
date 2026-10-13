@@ -18,7 +18,13 @@ impl SqlitePlannerRepository {
         let db = Connection::open(snapshot_file(&self.dir, snapshot)?)?;
         db.busy_timeout(Duration::from_secs(5))?;
         db.execute_batch(
-            "CREATE TABLE IF NOT EXISTS planner (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS planner (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS shortlist (player_id INTEGER PRIMARY KEY);
+             -- once: the old planner `kept` list held player copies; keep only their ids
+             INSERT OR IGNORE INTO shortlist
+               SELECT json_extract(j.value, '$.id') FROM planner, json_each(planner.value) j
+               WHERE planner.key = 'kept';
+             DELETE FROM planner WHERE key = 'kept';",
         )?;
         Ok(db)
     }
@@ -31,6 +37,24 @@ impl PlannerRepository for SqlitePlannerRepository {
             .query_row("SELECT value FROM planner WHERE key=?", [key], |r| r.get(0))
             .optional()?;
         raw.map(|raw| Ok(serde_json::from_str(&raw)?)).transpose()
+    }
+    fn shortlist(&self, snapshot: &SnapshotId) -> Result<Vec<u32>> {
+        let db = self.open(snapshot)?;
+        let mut stmt = db.prepare("SELECT player_id FROM shortlist ORDER BY player_id")?;
+        let ids = stmt
+            .query_map([], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<u32>>>()?;
+        Ok(ids)
+    }
+    fn shortlist_add(&self, snapshot: &SnapshotId, player: u32) -> Result<()> {
+        self.open(snapshot)?
+            .execute("INSERT OR IGNORE INTO shortlist VALUES (?)", [player])?;
+        Ok(())
+    }
+    fn shortlist_remove(&self, snapshot: &SnapshotId, player: u32) -> Result<()> {
+        self.open(snapshot)?
+            .execute("DELETE FROM shortlist WHERE player_id = ?", [player])?;
+        Ok(())
     }
     fn put(&self, snapshot: &SnapshotId, key: &str, value: &Value) -> Result<()> {
         self.open(snapshot)?.execute(

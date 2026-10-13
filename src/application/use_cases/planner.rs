@@ -6,6 +6,9 @@ use std::sync::Arc;
 pub trait PlannerRepository: Send + Sync {
     fn get(&self, snapshot: &SnapshotId, key: &str) -> Result<Option<Value>>;
     fn put(&self, snapshot: &SnapshotId, key: &str, value: &Value) -> Result<()>;
+    fn shortlist(&self, snapshot: &SnapshotId) -> Result<Vec<u32>>;
+    fn shortlist_add(&self, snapshot: &SnapshotId, player: u32) -> Result<()>;
+    fn shortlist_remove(&self, snapshot: &SnapshotId, player: u32) -> Result<()>;
 }
 
 pub struct PlannerUseCase {
@@ -21,6 +24,17 @@ impl PlannerUseCase {
     pub fn put(&self, snapshot: &str, key: &str, value: &Value) -> Result<()> {
         self.planner
             .put(&SnapshotId::parse(snapshot)?, valid(key)?, value)
+    }
+    pub fn shortlist(&self, snapshot: &str) -> Result<Vec<u32>> {
+        self.planner.shortlist(&SnapshotId::parse(snapshot)?)
+    }
+    pub fn shortlist_add(&self, snapshot: &str, player: u32) -> Result<()> {
+        self.planner
+            .shortlist_add(&SnapshotId::parse(snapshot)?, player)
+    }
+    pub fn shortlist_remove(&self, snapshot: &str, player: u32) -> Result<()> {
+        self.planner
+            .shortlist_remove(&SnapshotId::parse(snapshot)?, player)
     }
 }
 

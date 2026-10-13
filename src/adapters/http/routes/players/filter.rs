@@ -99,6 +99,9 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
         }
         filter.contract_end_max = Some(date.clone());
     }
+    filter.or_no_contract = flag("orNoContract");
+    filter.shortlist = flag("shortlist");
+    filter.exclude_club = integer("excludeClub", 0, MAX_CLUB)?.map(|n| n as u32);
     filter.no_contract = flag("noContract");
     filter.transfer_listed = flag("transferListed");
     filter.loan_listed = flag("loanListed");
@@ -139,6 +142,10 @@ pub fn parse_filter(query: &str) -> Result<PlayerFilter> {
         "age" => SortKey::Age,
         "ca" => SortKey::Ca,
         "pa" => SortKey::Pa,
+        "position" => SortKey::Position,
+        "value" => SortKey::Value,
+        "wage" => SortKey::Wage,
+        "contractEnd" => SortKey::ContractEnd,
         key if CATALOG.attributes.iter().any(|a| a.key == key) => {
             SortKey::Attribute(key.to_owned())
         }

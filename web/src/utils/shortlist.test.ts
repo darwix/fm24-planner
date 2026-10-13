@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PoolPlayer } from "@/models/player";
-import { stars, shortlistView } from "./shortlist";
+import { canPlay, stars, shortlistView } from "./shortlist";
 
 describe("stars", () => {
   it("rounds CA and PA to half stars, 200 = 5", () => {
@@ -68,5 +68,16 @@ describe("shortlistView", () => {
   it("does not change the list it is given", () => {
     shortlistView(list, none, { k: "v", dir: -1 });
     expect(ids(list)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("canPlay", () => {
+  it("uses every position he can play", () => {
+    expect(canPlay(pl(1, { p: "DC", pos: ["DC", "DM"] }), "DM")).toBe(true);
+    expect(canPlay(pl(1, { p: "DC", pos: ["DC"] }), "DM")).toBe(false);
+  });
+  it("falls back to the main position for players kept before positions were stored", () => {
+    expect(canPlay(pl(1, { p: "DM" }), "DM")).toBe(true);
+    expect(canPlay(pl(1, { p: "DC" }), "DM")).toBe(false);
   });
 });

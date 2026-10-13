@@ -57,6 +57,9 @@ describe("toPool", () => {
       toPool({ ...api, contractEnd: null }, "2053-02-18").left,
     ).toBeUndefined();
   });
+  it("keeps every position he can play", () => {
+    expect(toPool(api, "2053-02-18").pos).toEqual(["MC", "AMC"]);
+  });
   it("uses the first position as the backend names it", () => {
     expect(toPool({ ...api, positions: ["AMC"] }, "2053-02-18").p).toBe("AMC");
   });

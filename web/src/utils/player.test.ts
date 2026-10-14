@@ -104,6 +104,10 @@ describe("scoutQuery", () => {
     expect(q.contractEndMax).toBeUndefined();
     expect(q.valueUnknown).toBe(1);
   });
+  it("leaves out your own club, like the in-game search", () => {
+    expect(scoutQuery(f, "2053-03-01", 305).excludeClub).toBe(305);
+    expect(scoutQuery(f, "2053-03-01")).not.toHaveProperty("excludeClub");
+  });
 });
 
 describe("nameQuery", () => {

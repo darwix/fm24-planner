@@ -41,5 +41,4 @@ A pre-commit hook runs Prettier on `web/`, and the PR workflow checks format, te
 - `web/`: React 18 + TypeScript app (react-router, recoil, swr, axios). Builds to `web/dist/client`, which the desktop exe embeds.
 - `src-tauri/`: Tauri desktop app; runs the server in-process and serves the embedded web app.
 - `src/`: Rust parser and API server (`src/adapters/parser/contract.rs` reads wage, contract end and value).
-- `mock/`: the chosen HTML design (`a-board.html`).
 - `CLAUDE.md`: project notes and decisions.

@@ -1,6 +1,6 @@
 # Design
 
-Source of truth: `mock/a-board.html`. Warm "paper" look, editorial headings, one dark accent. Keep it quiet: no gradients, no heavy shadows.
+Source of truth: `mock/a-board.html` (removed; in git history at `011a622`). Warm "paper" look, editorial headings, one dark accent. Keep it quiet: no gradients, no heavy shadows.
 
 ## Colour tokens
 

@@ -1,64 +1,72 @@
 import "./scouting.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
 import { listIndexState, listsState } from "@/atoms/scoutState";
-import { clubState, squadState } from "@/atoms/squadState";
-import type { PoolPlayer, ScoutFilter } from "@/models/player";
+import { clubState } from "@/atoms/squadState";
+import type { ScoutFilter } from "@/models/player";
 import { useSearchResult } from "@/services/save";
 import Brief from "@/components/Brief";
-import { money, wage } from "@/utils/format";
 import { nameQuery, scoutQuery, toPool } from "@/utils/player";
 
 export default function Scouting() {
   const nav = useNavigate();
   const [lists, setLists] = useRecoilState(listsState);
   const [li, setLi] = useRecoilState(listIndexState);
-  const [squad, setSquad] = useRecoilState(squadState);
   const club = useRecoilValue(clubState);
   const L = lists[li] ?? lists[0];
   const f = L.f;
   // the backend filters and ranks by potential
   const [text, setText] = useState("");
-  const searching = nameQuery(text);
+  // wait for a pause in typing before querying
+  const [typed, setTyped] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setTyped(text), 300);
+    return () => clearTimeout(t);
+  }, [text]);
+  const searching = nameQuery(typed);
   const result = useSearchResult(
     club?.snapshotId,
-    club ? (searching ?? scoutQuery(f, club.gameDate, club.id)) : null,
+    club ? scoutQuery(f, club.gameDate, club.id) : null,
   );
-  const found = result?.players;
-  const [list, setList] = useState(false);
+  const found = useSearchResult(club?.snapshotId, searching)?.players;
+  const hits = club && found?.map((p) => toPool(p, club.gameDate));
   if (!club) return <Navigate to="/upload" replace />;
-  const rows = (found ?? []).map((p) => toPool(p, club.gameDate));
   const patch = (next: Partial<ScoutFilter>) =>
     setLists(
       lists.map((l, i) => (i === li ? { ...l, f: { ...l.f, ...next } } : l)),
     );
   const rename = (name: string) =>
     setLists(lists.map((l, i) => (i === li ? { ...l, name } : l)));
-  const addToSquad = (p: PoolPlayer) => {
-    setSquad([
-      ...squad,
-      {
-        id: p.id,
-        n: p.n,
-        cl: p.cl,
-        p: p.p,
-        a: p.a,
-        ca: p.ca,
-        pa: p.pa,
-        c: p.c,
-        left: p.left,
-        v: p.v,
-        w: p.w,
-        at: {},
-      },
-    ]);
-    nav("/squad");
-  };
-
   return (
     <section className="wrap2 sc">
       <div>
+        <div className="find">
+          <input
+            type="search"
+            placeholder="Find a player by name"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <small>Searches everyone, ignores the brief.</small>
+          {hits && (
+            <div className="res">
+              {hits.slice(0, 8).map((p) => (
+                <div key={p.id} onClick={() => nav(`/player/${p.id}`)}>
+                  <b>{p.n}</b>
+                  <small>
+                    {p.p} · {p.a} · {p.cl || "Free agent"}
+                  </small>
+                </div>
+              ))}
+              {!hits.length && (
+                <div>
+                  <small>No players match.</small>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <h2>Lists</h2>
         <div className="sub">Saved scouting searches</div>
         <div className="ls">
@@ -124,92 +132,8 @@ export default function Scouting() {
           f={f}
           patch={patch}
           total={result?.total}
-          list={list}
-          onList={() => setList(!list)}
           onStart={() => nav("/scouting/swipe")}
         />
-        {list && (
-          <input
-            type="search"
-            className="find"
-            placeholder="Search by name (ignores the filters above)"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-        )}
-        {list && (
-          <table className="tb">
-            <thead>
-              <tr>
-                <th>PA</th>
-                <th>Name</th>
-                <th>Pos</th>
-                <th>Age</th>
-                <th>From</th>
-                <th>CA</th>
-                <th>Contract</th>
-                <th className="r">Value</th>
-                <th className="r">Wage</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr
-                  key={p.id}
-                  className="cl"
-                  onClick={() => nav(`/player/${p.id}`)}
-                >
-                  <td className="pa">{p.pa}</td>
-                  <td>
-                    <b>{p.n}</b>
-                    <br />
-                    <span style={{ color: "var(--mut)", fontSize: 12 }}>
-                      {p.cl}
-                    </span>
-                  </td>
-                  <td>{p.p}</td>
-                  <td>{p.a}</td>
-                  <td>{p.nat}</td>
-                  <td>{p.ca}</td>
-                  <td
-                    style={
-                      p.left !== undefined && p.left <= 12
-                        ? { color: "var(--warn)", fontWeight: 600 }
-                        : undefined
-                    }
-                  >
-                    {p.left === undefined
-                      ? "n/a"
-                      : p.left === 0
-                        ? "Expired"
-                        : `${p.left} months`}
-                  </td>
-                  <td className="r">{money(p.v)}</td>
-                  <td className="r">{wage(p.w)}</td>
-                  <td className="r">
-                    <button
-                      className="btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToSquad(p);
-                      }}
-                    >
-                      + Add
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {found && !rows.length && (
-                <tr>
-                  <td colSpan={10} className="sub" style={{ padding: 24 }}>
-                    No players match.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
       </div>
     </section>
   );

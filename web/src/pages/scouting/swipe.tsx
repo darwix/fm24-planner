@@ -16,7 +16,7 @@ import {
   getShortlist,
   removeShortlist,
 } from "@/services/shortlist";
-import { scoutQuery, swipeBody, toPool } from "@/utils/player";
+import { morePages, scoutQuery, swipeBody, toPool } from "@/utils/player";
 
 const THRESH = 110;
 const SHOWN = ["Technical", "Mental", "Physical"];
@@ -161,6 +161,7 @@ export default function Swipe() {
   const [flip, setFlip] = useState(false);
   const [out, setOut] = useState(0);
   const [dx, setDx] = useState<number | null>(null);
+  const [view, setView] = useState<"cards" | "list">("cards");
   const x0 = useRef(0);
   const page = useRef(0);
   const busy = useRef(false);
@@ -211,8 +212,7 @@ export default function Swipe() {
   // top up before the stack runs dry
   useEffect(() => {
     if (loaded && total !== undefined && stack.length - i <= 5) {
-      const loadedCount = page.current * 50;
-      if (loadedCount < total) more();
+      if (morePages(page.current, total)) more();
     }
   }, [i, stack.length, total, loaded, more]);
 
@@ -231,6 +231,10 @@ export default function Swipe() {
   const rest = stack.slice(i, i + 3);
   const left = total === undefined ? undefined : total - i;
 
+  const shortlist = (p: PoolPlayer) => {
+    setKept((k) => [...k, p.id]);
+    addShortlist(snap, p.id).catch(console.error);
+  };
   const commit = (dir: number) => {
     if (!top) return;
     setHist((h) => [...h, { p: top, dir }]);
@@ -303,97 +307,200 @@ export default function Swipe() {
           ← Filters
         </button>
         <span className="sub">
-          Swipe right to shortlist, left to pass
+          {view === "cards"
+            ? "Swipe right to shortlist, left to pass"
+            : "Ranked by potential"}
           {total !== undefined && ` · ${total.toLocaleString()} match`}
         </span>
+        <div className="seg">
+          <button
+            className={view === "cards" ? "on" : ""}
+            onClick={() => setView("cards")}
+          >
+            ▢ Cards
+          </button>
+          <button
+            className={view === "list" ? "on" : ""}
+            onClick={() => setView("list")}
+          >
+            ☰ List
+          </button>
+        </div>
         <button className="btn" onClick={() => nav("/shortlist")}>
           Shortlist ({kept.length})
         </button>
       </div>
-      <div
-        className={`stage ${open ? "open" : ""} ${closing ? "closing" : ""}`}
-      >
-        <div className="main">
-          <div className="deck">
-            {!top && (
-              <div className="card">
-                <div className="done">
-                  <h2>{loaded ? "All scouted" : "Loading…"}</h2>
-                  {loaded && <div>{kept.length} on your shortlist</div>}
-                </div>
-              </div>
-            )}
-            {[...rest].reverse().map((p, k) => {
-              const depth = rest.length - 1 - k;
-              const isTop = depth === 0;
-              return (
-                <div
+      {view === "list" && (
+        <>
+          <table className="tb">
+            <thead>
+              <tr>
+                <th>PA</th>
+                <th>Name</th>
+                <th>Pos</th>
+                <th>Age</th>
+                <th>CA</th>
+                <th>Contract</th>
+                <th className="r">Value</th>
+                <th className="r">Wage</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {/* players swiped this run stay out, like the stack */}
+              {stack.slice(i).map((p) => (
+                <tr
                   key={p.id}
-                  className={`card ${isTop && dx !== null && !open ? "drag" : ""}`}
-                  style={cardStyle(depth)}
-                  onPointerDown={
-                    isTop
-                      ? (e) => {
-                          x0.current = e.clientX;
-                          e.currentTarget.setPointerCapture(e.pointerId);
-                          setDx(0);
-                        }
-                      : undefined
-                  }
-                  onPointerMove={
-                    isTop && dx !== null
-                      ? (e) => setDx(e.clientX - x0.current)
-                      : undefined
-                  }
-                  onPointerUp={
-                    isTop && dx !== null
-                      ? (e) => {
-                          const d = e.clientX - x0.current;
-                          if (Math.abs(d) < 5) {
-                            setDx(null);
-                            book();
-                          } else if (Math.abs(d) > THRESH && !open) {
-                            fly(Math.sign(d));
-                          } else setDx(null);
-                        }
-                      : undefined
-                  }
+                  className="cl"
+                  onClick={() => nav(`/player/${p.id}`)}
                 >
-                  <Face p={p} drag={isTop && !open ? (dx ?? 0) : 0} />
-                </div>
-              );
-            })}
+                  <td className="pa">{p.pa}</td>
+                  <td>
+                    <b>{p.n}</b>
+                    <br />
+                    <span className="sub">{p.cl || "No club"}</span>
+                  </td>
+                  <td>{p.p}</td>
+                  <td>{p.a}</td>
+                  <td>{p.ca}</td>
+                  <td
+                    className={
+                      p.left !== undefined && p.left <= 12 ? "warn" : undefined
+                    }
+                  >
+                    {p.left === undefined
+                      ? "n/a"
+                      : p.left === 0
+                        ? "Expired"
+                        : `${p.left} months`}
+                  </td>
+                  <td className="r">{money(p.v)}</td>
+                  <td className="r">{wage(p.w)}</td>
+                  <td className="r">
+                    {kept.includes(p.id) ? (
+                      <span className="sub">✓ Shortlisted</span>
+                    ) : (
+                      <button
+                        className="btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          shortlist(p);
+                        }}
+                      >
+                        + Shortlist
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {loaded && stack.length <= i && (
+                <tr>
+                  <td colSpan={9} className="sub">
+                    No players match.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {morePages(page.current, total) && (
+            <button className="btn more" onClick={more}>
+              Load 50 more
+            </button>
+          )}
+        </>
+      )}
+      {view === "cards" && (
+        <>
+          <div
+            className={`stage ${open ? "open" : ""} ${closing ? "closing" : ""}`}
+          >
+            <div className="main">
+              <div className="deck">
+                {!top && (
+                  <div className="card">
+                    <div className="done">
+                      <h2>{loaded ? "All scouted" : "Loading…"}</h2>
+                      {loaded && <div>{kept.length} on your shortlist</div>}
+                    </div>
+                  </div>
+                )}
+                {[...rest].reverse().map((p, k) => {
+                  const depth = rest.length - 1 - k;
+                  const isTop = depth === 0;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`card ${isTop && dx !== null && !open ? "drag" : ""}`}
+                      style={cardStyle(depth)}
+                      onPointerDown={
+                        isTop
+                          ? (e) => {
+                              x0.current = e.clientX;
+                              e.currentTarget.setPointerCapture(e.pointerId);
+                              setDx(0);
+                            }
+                          : undefined
+                      }
+                      onPointerMove={
+                        isTop && dx !== null
+                          ? (e) => setDx(e.clientX - x0.current)
+                          : undefined
+                      }
+                      onPointerUp={
+                        isTop && dx !== null
+                          ? (e) => {
+                              const d = e.clientX - x0.current;
+                              if (Math.abs(d) < 5) {
+                                setDx(null);
+                                book();
+                              } else if (Math.abs(d) > THRESH && !open) {
+                                fly(Math.sign(d));
+                              } else setDx(null);
+                            }
+                          : undefined
+                      }
+                    >
+                      <Face p={p} drag={isTop && !open ? (dx ?? 0) : 0} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className={`panel ${flip ? "flip" : ""}`}>
+              {open && top && <Detail snap={snap} p={top} onClose={book} />}
+            </div>
           </div>
-        </div>
-        <div className={`panel ${flip ? "flip" : ""}`}>
-          {open && top && <Detail snap={snap} p={top} onClose={book} />}
-        </div>
-      </div>
-      <div className="controls">
-        <div className="acts">
-          <button className="round sm" onClick={undo} disabled={!hist.length}>
-            Undo
-          </button>
-          <button className="round no" onClick={() => fly(-1)}>
-            Pass
-          </button>
-          <button className="round yes" onClick={() => fly(1)}>
-            Sign
-          </button>
-        </div>
-        <div className="count">
-          {top && left !== undefined ? `${left.toLocaleString()} left` : ""}
-        </div>
-        <div className="picked">
-          {hist
-            .filter((h) => h.dir > 0)
-            .map(({ p }) => (
-              <span key={p.id} onClick={() => nav(`/player/${p.id}`)}>
-                {p.n}
-              </span>
-            ))}
-        </div>
-      </div>
+          <div className="controls">
+            <div className="acts">
+              <button
+                className="round sm"
+                onClick={undo}
+                disabled={!hist.length}
+              >
+                Undo
+              </button>
+              <button className="round no" onClick={() => fly(-1)}>
+                Pass
+              </button>
+              <button className="round yes" onClick={() => fly(1)}>
+                Sign
+              </button>
+            </div>
+            <div className="count">
+              {top && left !== undefined ? `${left.toLocaleString()} left` : ""}
+            </div>
+            <div className="picked">
+              {hist
+                .filter((h) => h.dir > 0)
+                .map(({ p }) => (
+                  <span key={p.id} onClick={() => nav(`/player/${p.id}`)}>
+                    {p.n}
+                  </span>
+                ))}
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }

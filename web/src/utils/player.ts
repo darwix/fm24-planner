@@ -79,6 +79,9 @@ export const toPool = (p: ApiPlayer, gameDate: string): PoolPlayer => ({
 });
 
 export const SWIPE_PAGE = 50;
+// another page of the stack/list is worth fetching
+export const morePages = (pages: number, total?: number) =>
+  total !== undefined && pages * SWIPE_PAGE < total;
 
 // POST body for one page of the swipe stack
 export const swipeBody = (

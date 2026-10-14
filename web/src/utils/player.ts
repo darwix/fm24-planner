@@ -21,7 +21,12 @@ export const expiryCutoff = (now: string, months: number) => {
 };
 
 // con: 0 any, -1 expired (no contract, at a club or free), N = contract ends within N months
-export const scoutQuery = (f: ScoutFilter, gameDate: string) => ({
+export const scoutQuery = (
+  f: ScoutFilter,
+  gameDate: string,
+  clubId?: number,
+) => ({
+  ...(clubId != null && { excludeClub: clubId }),
   ...(f.pos.length && {
     mainPosition: f.pos.map((x) => POS_INDEX[x]).join(","),
   }),

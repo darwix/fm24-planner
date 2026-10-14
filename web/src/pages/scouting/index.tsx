@@ -23,7 +23,7 @@ export default function Scouting() {
   const searching = nameQuery(text);
   const result = useSearchResult(
     club?.snapshotId,
-    club ? (searching ?? scoutQuery(f, club.gameDate)) : null,
+    club ? (searching ?? scoutQuery(f, club.gameDate, club.id)) : null,
   );
   const found = result?.players;
   const [list, setList] = useState(false);

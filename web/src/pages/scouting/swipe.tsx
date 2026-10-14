@@ -175,7 +175,7 @@ export default function Swipe() {
     try {
       const r = await searchPage(
         club.snapshotId,
-        swipeBody(scoutQuery(f, club.gameDate), page.current + 1),
+        swipeBody(scoutQuery(f, club.gameDate, club.id), page.current + 1),
       );
       page.current += 1;
       setTotal(r.total);

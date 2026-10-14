@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FM Squad Planner",
+  "version": "1.4.0",
+  "identifier": "io.github.darwix.FMSquadPlanner",
+  "build": {
+    "beforeBuildCommand": "npm run build:web",
+    "frontendDist": "../web/dist/client"
+  },
+  "app": {
+    "windows": []
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Plan your Football Manager 2024 squad from a save.",
+    "resources": { "../web/dist/client/": "web/" },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.icns"
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" },
+      "nsis": { "installMode": "currentUser", "displayLanguageSelector": false }
+    }
+  }
+}

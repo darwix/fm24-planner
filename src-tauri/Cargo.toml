@@ -1,0 +1,16 @@
+[package]
+name = "fm-squad-planner-desktop"
+version = "1.4.0"
+edition = "2021"
+publish = false
+description = "FM Squad Planner desktop application"
+
+[dependencies]
+fm-squad-planner = { path = ".." }
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }

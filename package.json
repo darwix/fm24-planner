@@ -12,6 +12,11 @@
     "test:parity": "node scripts/parity.mjs",
     "build:web": "npm --prefix web run build",
     "build": "npm run build:web && cargo build --release --locked -p fm-savelens-backend",
+    "desktop": "tauri dev",
+    "build:desktop": "tauri build",
     "inspect": "cargo run --release --locked --example parse-save --"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4"
   }
 }

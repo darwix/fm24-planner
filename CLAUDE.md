@@ -13,7 +13,7 @@ Test save: `Meong Racun - 2052 (v03).fm` (~400 MB). `savelens/FM SaveLens 24/` h
 
 ## Status: React app on a patched SaveLens backend (real wage, contract end, value)
 
-**Layout**: the repo root is the SaveLens clone (Rust in `src/` (`domain/`, `adapters/` = parser + storage, `services/`, `error.rs`), `tests/`; no desktop app, browser only), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; served by Vite, the Rust server is API-only and no longer embeds the build). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
+**Layout**: the repo root is the SaveLens clone (Rust in `src/` (`domain/`, `adapters/` = parser + storage, `services/`, `error.rs`), `tests/`; desktop app in `src-tauri/`: runs the server in-process on a free port and serves the bundled `web/dist/client` via `infra::app::serve_web`; `npm run desktop` / `npm run build:desktop` from the root), patched by us (no licence, never publish). Our React app is `web/` (replaces the original SaveLens frontend; served by Vite, the Rust server is API-only and no longer embeds the build). Run web commands from `web/`. The old `savelens-src/` paths below now mean the repo root; its upstream `.git` and original `web/` are backed up outside the repo. `mock/` and `DESIGN.md` stay at the root.
 
 `web/src/` follows `../react-template` (React 18 + TS, react-router, recoil, swr, axios; `pages/`, `components/`, `atoms/`, `services/`, `models/`, `utils/`, glob routes). Kept our own CSS (no antd). Dev server proxies `/api` to a SaveLens server on :4242.
 

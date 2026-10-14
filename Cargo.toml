@@ -5,6 +5,11 @@ edition = "2021"
 publish = false
 description = "Read-only Football Manager 2024 save database"
 
+[workspace]
+members = ["src-tauri"]
+default-members = ["."]
+resolver = "2"
+
 [lib]
 path = "src/lib.rs"
 

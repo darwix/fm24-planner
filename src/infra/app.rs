@@ -41,34 +41,25 @@ async fn guard(State(port): State<u16>, req: Request<Body>, next: Next) -> Respo
     next.run(req).await
 }
 
-/// Serve the built web app from `dir` (the desktop app), falling back to `index.html` for routes.
-pub fn serve_web(router: Router, dir: std::path::PathBuf) -> Router {
+/// Serve the built web app through `get(path) -> (bytes, mime)` (the desktop app's embedded
+/// assets), falling back to `index.html` for routes.
+pub fn serve_web<F>(router: Router, get: F) -> Router
+where
+    F: Fn(&str) -> Option<(Vec<u8>, String)> + Clone + Send + Sync + 'static,
+{
     router.fallback(move |req: Request<Body>| {
-        let dir = dir.clone();
+        let get = get.clone();
         async move {
             let rel = req.uri().path().trim_start_matches('/');
-            // ponytail: no percent-decoding; Vite's build output has plain ASCII names
-            let mut path = dir.join(rel);
             if rel.starts_with("api/") {
                 return reply(404, json!({"error":"Not found."}));
             }
-            if rel.contains("..") || !path.is_file() {
-                path = dir.join("index.html");
-            }
-            let mime = match path.extension().and_then(|e| e.to_str()) {
-                Some("html") => "text/html; charset=utf-8",
-                Some("js") => "text/javascript",
-                Some("css") => "text/css",
-                Some("svg") => "image/svg+xml",
-                Some("png") => "image/png",
-                _ => "application/octet-stream",
-            };
-            match std::fs::read(&path) {
-                Ok(bytes) => Response::builder()
+            match get(rel).or_else(|| get("index.html")) {
+                Some((bytes, mime)) => Response::builder()
                     .header("content-type", mime)
                     .body(Body::from(bytes))
                     .unwrap(),
-                Err(_) => reply(404, json!({"error":"Not found."})),
+                None => reply(404, json!({"error":"Not found."})),
             }
         }
     })

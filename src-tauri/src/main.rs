@@ -4,7 +4,7 @@ use fm_squad_planner::infra::{
     config::default_data_dir,
     setup::init_app_state,
 };
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 
 /// Runs the API server in-process on a free port and opens a window on it.
@@ -17,7 +17,12 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
-            let web = app.path().resource_dir()?.join("web");
+            let assets = std::sync::Arc::new(app.asset_resolver());
+            let web = move |path: &str| {
+                assets
+                    .get(path.to_string())
+                    .map(|a| (a.bytes, a.mime_type))
+            };
             let started = executor.block_on(async {
                 let (state, data) = init_app_state(&default_data_dir())?;
                 let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await?;

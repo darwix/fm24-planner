@@ -55,6 +55,30 @@ fn snapshot_metadata_preserves_fractional_source_timestamps() {
 }
 
 #[test]
+fn publishing_a_snapshot_deletes_older_snapshots() {
+    let dir = tempfile::tempdir().unwrap();
+    let old = "a".repeat(64);
+    for f in [
+        format!("{old}.sqlite"),
+        format!("{old}.sqlite-wal"),
+        "job.partial.sqlite".into(),
+        "other.partial.sqlite".into(),
+    ] {
+        fs::write(dir.path().join(f), b"x").unwrap();
+    }
+    let new = "b".repeat(64);
+    SqliteSnapshotRepository::new(dir.path().into())
+        .publish("job", &SnapshotId::parse(&new).unwrap())
+        .unwrap();
+    let mut left: Vec<_> = fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    left.sort();
+    assert_eq!(left, [format!("{new}.sqlite"), "other.partial.sqlite".into()]);
+}
+
+#[test]
 fn compressed_and_plain_records_match_and_query_correctly() {
     let dir = tempfile::tempdir().unwrap();
     let cancel = CancelFlag::new();

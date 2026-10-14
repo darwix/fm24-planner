@@ -37,7 +37,7 @@ src/
 │   └── parser/             reads the .fm save format, little-endian byte readers
 ├── infra/
 │   ├── setup.rs            init_app_state: builds adapters and use cases
-│   ├── app.rs              router with the host and origin guard
+│   ├── app.rs              router with the host and origin guard; serve_web for the desktop app
 │   ├── data_dir.rs         data directory, instance lock, leftover cleanup
 │   └── config.rs           command-line arguments and defaults
 ├── utils/                  helpers used by more than one layer: cancel (CancelFlag), files

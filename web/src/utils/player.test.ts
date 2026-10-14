@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { POS_INDEX, nameQuery, scoutQuery, monthsLeft, toPool } from "./player";
+import {
+  POS_INDEX,
+  morePages,
+  nameQuery,
+  scoutQuery,
+  monthsLeft,
+  toPool,
+} from "./player";
 
 describe("monthsLeft", () => {
   it("counts whole months from the game date to the contract end", () => {
@@ -150,5 +157,17 @@ describe("listed filters", () => {
       loanListed: false,
     };
     expect(toPool(api, "2053-03-01")).toMatchObject({ tl: true, ll: false });
+  });
+});
+
+describe("morePages", () => {
+  it("is true while fewer pages are loaded than the total needs", () => {
+    expect(morePages(1, 51)).toBe(true);
+    expect(morePages(2, 120)).toBe(true);
+  });
+  it("is false once every player is loaded or the total is unknown", () => {
+    expect(morePages(1, 50)).toBe(false);
+    expect(morePages(0, 0)).toBe(false);
+    expect(morePages(1, undefined)).toBe(false);
   });
 });

@@ -44,6 +44,11 @@ export default function Player() {
         {own ? "← Back to squad" : "← Back to scouting"}
       </a>
       <div className="top">
+        {/* ponytail: no faces in the save (newgens), so a silhouette */}
+        <svg className="face" viewBox="0 0 64 64" aria-hidden="true">
+          <circle cx="32" cy="24" r="12" />
+          <path d="M8 64c0-14 11-22 24-22s24 8 24 22z" />
+        </svg>
         <div>
           <div className="sub" style={{ margin: 0 }}>
             {p.cl}

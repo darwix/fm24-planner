@@ -8,11 +8,20 @@
 }
 .pd .top {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   gap: 24px;
   align-items: end;
   padding: 8px 0 24px;
   border-bottom: 1px solid var(--line);
+}
+.pd .face {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  fill: var(--line);
+  align-self: center;
 }
 .pd h2 {
   font-size: 42px;

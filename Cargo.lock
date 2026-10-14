@@ -868,7 +868,7 @@ dependencies = [
 
 [[package]]
 name = "fm-squad-planner"
-version = "1.4.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
@@ -892,7 +892,7 @@ dependencies = [
 
 [[package]]
 name = "fm-squad-planner-desktop"
-version = "1.4.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "fm-squad-planner",

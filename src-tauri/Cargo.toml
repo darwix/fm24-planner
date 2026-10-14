@@ -1,6 +1,6 @@
 [package]
 name = "fm-squad-planner-desktop"
-version = "1.4.0"
+version = "0.1.0"
 edition = "2021"
 publish = false
 description = "FM Squad Planner desktop application"

@@ -1,6 +1,6 @@
 [package]
 name = "fm-squad-planner"
-version = "1.4.0"
+version = "0.1.0"
 edition = "2021"
 publish = false
 description = "Read-only Football Manager 2024 save database"

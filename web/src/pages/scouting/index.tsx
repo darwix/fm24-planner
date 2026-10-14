@@ -1,13 +1,13 @@
-import "./scouting.css";
+import { listIndexState, listsState } from "@/atoms/scoutState";
+import { clubState } from "@/atoms/squadState";
+import Brief from "@/components/Brief";
+import type { ScoutFilter } from "@/models/player";
+import { useSearchResult } from "@/services/save";
+import { nameQuery, scoutQuery, toPool } from "@/utils/player";
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useRecoilState, useRecoilValue } from "recoil";
-import { listIndexState, listsState } from "@/atoms/scoutState";
-import { clubState } from "@/atoms/squadState";
-import type { ScoutFilter } from "@/models/player";
-import { useSearchResult } from "@/services/save";
-import Brief from "@/components/Brief";
-import { nameQuery, scoutQuery, toPool } from "@/utils/player";
+import "./scouting.css";
 
 export default function Scouting() {
   const nav = useNavigate();
@@ -48,7 +48,6 @@ export default function Scouting() {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <small>Searches everyone, ignores the brief.</small>
           {hits && (
             <div className="res">
               {hits.slice(0, 8).map((p) => (

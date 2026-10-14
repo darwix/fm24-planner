@@ -1,5 +1,5 @@
 {
-  "name": "fm-savelens-24",
+  "name": "fm-squad-planner",
   "version": "1.4.0",
   "private": true,
   "type": "module",
@@ -7,11 +7,11 @@
     "node": ">=24.14.0"
   },
   "scripts": {
-    "start": "cargo run --locked -p fm-savelens-backend --bin fm-savelens-24-server -- --no-open",
-    "test": "cargo test --locked -p fm-savelens-backend",
+    "start": "cargo run --locked -p fm-squad-planner --bin fm-squad-planner-server -- --no-open",
+    "test": "cargo test --locked -p fm-squad-planner",
     "test:parity": "node scripts/parity.mjs",
     "build:web": "npm --prefix web run build",
-    "build": "npm run build:web && cargo build --release --locked -p fm-savelens-backend",
+    "build": "cargo build --release --locked -p fm-squad-planner",
     "desktop": "tauri dev",
     "build:desktop": "tauri build",
     "inspect": "cargo run --release --locked --example parse-save --"

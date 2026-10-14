@@ -162,7 +162,15 @@ impl SnapshotRepository for SqliteSnapshotRepository {
         create_snapshot(&self.partial(job_id), snapshot, cancel)
     }
     fn publish(&self, job_id: &str, id: &SnapshotId) -> Result<()> {
-        fs::rename(self.partial(job_id), self.dir.join(format!("{id}.sqlite")))?;
+        let keep = format!("{id}.sqlite");
+        fs::rename(self.partial(job_id), self.dir.join(&keep))?;
+        // Only the latest save is kept: older snapshots (and their sqlite side files) go.
+        for entry in fs::read_dir(&self.dir)? {
+            let name = entry?.file_name().to_string_lossy().into_owned();
+            if name.contains(".sqlite") && !name.contains(".partial.") && name != keep {
+                fs::remove_file(self.dir.join(name))?;
+            }
+        }
         Ok(())
     }
     fn unpublish(&self, id: &SnapshotId) -> Result<()> {

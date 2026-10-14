@@ -4,6 +4,12 @@ A local Football Manager 2024 squad planner. Load a `.fm` save, arrange your squ
 
 Built on [FM SaveLens 24](https://github.com/MSalman5230/FM-SaveLens-24), whose Rust parser reads the save. This repository patches it to also read wage, contract end and value. It has no licence, so keep this repository private. Supports FM24 save format **24.3.0+0**. Not affiliated with Sports Interactive or SEGA.
 
+## Screenshots
+
+| Squad | Scouting | Swipe |
+|---|---|---|
+| ![Squad](docs/img/squad.png) | ![Scouting filter](docs/img/scouting.png) | ![Swipe](docs/img/scouting-swipe.png) |
+
 ## Features
 
 - **Squad**: pitch with drag and drop, position depth panel, multi-position cover, add and remove players.
